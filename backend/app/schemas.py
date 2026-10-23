@@ -44,6 +44,24 @@ class IncidentCreate(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     people_affected: int = Field(default=1, ge=1)
+    photo_key: Optional[str] = None
+
+
+class PhotoUploadRequest(BaseModel):
+    content_type: str = Field(..., pattern=r"^(image/jpeg|image/png|image/webp)$")
+    file_ext: Optional[str] = Field(default=None, max_length=10)
+
+
+class PhotoUploadResponse(BaseModel):
+    upload_url: str
+    photo_key: str
+    expires_in: int = 300
+    max_bytes: int = 5 * 1024 * 1024
+
+
+class PhotoDownloadResponse(BaseModel):
+    photo_url: str
+    photo_key: str
 
 
 class IncidentOut(BaseModel):
@@ -59,8 +77,17 @@ class IncidentOut(BaseModel):
     priority: str
     status: str
     photo_key: Optional[str]
+    triage_score: Optional[int] = None
+    triage_reason: Optional[str] = None
+    auto_triaged_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
+
+
+class IncidentTriageRequest(BaseModel):
+    priority: str = Field(..., pattern=r"^(low|medium|high|critical)$")
+    triage_reason: str = Field(..., min_length=3, max_length=1000)
+    score: int = Field(..., ge=0, le=200)
 
 
 class IncidentDetail(IncidentOut):
@@ -142,3 +169,27 @@ class AssignmentOut(BaseModel):
     team_id: int
     assigned_by: int
     assigned_at: datetime
+
+
+# ── Audit Log ─────────────────────────────────────────────────
+
+class AuditLogOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    actor_id: Optional[int] = None
+    actor_role: Optional[str] = None
+    action: str
+    entity_type: Optional[str] = None
+    entity_id: Optional[int] = None
+    details: Optional[dict] = None
+    ip_address: Optional[str] = None
+    created_at: datetime
+    actor: Optional[UserOut] = None
+
+
+class AuditLogListResponse(BaseModel):
+    items: list[AuditLogOut]
+    total: int
+    page: int
+    limit: int
+

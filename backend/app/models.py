@@ -13,6 +13,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
+    JSON,
     String,
     Text,
 )
@@ -100,6 +101,9 @@ class Incident(Base):
     priority = Column(Enum(PriorityEnum), default=PriorityEnum.medium)
     status = Column(Enum(StatusEnum), default=StatusEnum.reported)
     photo_key = Column(String(500), nullable=True)  # reserved for S3
+    triage_score = Column(Integer, nullable=True)
+    triage_reason = Column(Text, nullable=True)
+    auto_triaged_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=_utcnow)
     updated_at = Column(DateTime(timezone=True), default=_utcnow, onupdate=_utcnow)
 
@@ -157,3 +161,19 @@ class StatusHistory(Base):
     note = Column(Text, nullable=True)
 
     incident = relationship("Incident", back_populates="status_history")
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_log"
+
+    id = Column(Integer, primary_key=True, index=True)
+    actor_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    actor_role = Column(String(50), nullable=True)
+    action = Column(String(100), nullable=False, index=True)
+    entity_type = Column(String(50), nullable=True, index=True)
+    entity_id = Column(Integer, nullable=True, index=True)
+    details = Column(JSON, nullable=True)
+    ip_address = Column(String(50), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=_utcnow, index=True)
+
+    actor = relationship("User", foreign_keys=[actor_id])

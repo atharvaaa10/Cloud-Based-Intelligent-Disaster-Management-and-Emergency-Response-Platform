@@ -4,10 +4,12 @@ Incident routes — CRUD + assignment + status management.
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+
+from app.audit import record_audit_event
 
 from app.database import get_db
 from app.deps import get_current_user, require_roles
@@ -25,12 +27,20 @@ from app.schemas import (
     IncidentCreate,
     IncidentDetail,
     IncidentOut,
+    PhotoDownloadResponse,
+    PhotoUploadRequest,
+    PhotoUploadResponse,
     PriorityUpdate,
     StatusHistoryOut,
     StatusUpdate,
     UserOut,
 )
-from app.aws_services import enqueue_incident_processing, notify_status_change
+from app.aws_services import (
+    enqueue_incident_processing,
+    generate_presigned_download_url,
+    generate_presigned_upload_url,
+    notify_status_change,
+)
 
 router = APIRouter(prefix="/incidents", tags=["incidents"])
 
@@ -52,15 +62,107 @@ async def create_incident(
         latitude=body.latitude,
         longitude=body.longitude,
         people_affected=body.people_affected,
+        photo_key=body.photo_key,
     )
     db.add(incident)
+    await db.commit()
+    await db.refresh(incident)
+
+    # Decoupled event-driven trigger via SQS:
+    # Offload auto-triage to background worker; queue failures never block response.
+    cat_val = incident.category.value if hasattr(incident.category, "value") else str(incident.category)
+    await enqueue_incident_processing(
+        incident_id=incident.id,
+        category=cat_val,
+        people_affected=incident.people_affected,
+        description=incident.description,
+        location_text=incident.location_text,
+        created_at=incident.created_at.isoformat() if incident.created_at else None,
+    )
+
+    return incident
+
+
+# ── Photos: S3 Presigned URLs ────────────────────────────────
+
+@router.post("/photo-upload-url", response_model=PhotoUploadResponse)
+async def get_precreation_photo_upload_url(
+    body: PhotoUploadRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Generate a presigned S3 PUT URL for uploading incident photo prior to creating incident.
+    """
+    try:
+        upload_data = generate_presigned_upload_url(
+            incident_id=0,
+            content_type=body.content_type,
+            file_ext=body.file_ext,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return PhotoUploadResponse(**upload_data)
+
+
+@router.post("/{incident_id}/photo-upload-url", response_model=PhotoUploadResponse)
+async def get_photo_upload_url(
+    incident_id: int,
+    body: PhotoUploadRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Generate a presigned S3 PUT URL for uploading incident emergency photos.
+    Restricted to the incident reporter, responder, or admin.
+    """
+    result = await db.execute(select(Incident).where(Incident.id == incident_id))
+    incident = result.scalar_one_or_none()
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+
+    if current_user.role.value == "citizen" and incident.reporter_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorised to upload photos for this incident")
+
+    try:
+        upload_data = generate_presigned_upload_url(
+            incident_id=incident_id,
+            content_type=body.content_type,
+            file_ext=body.file_ext,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # Store key in database
+    incident.photo_key = upload_data["photo_key"]
     await db.flush()
     await db.refresh(incident)
 
-    # AWS stub: enqueue for background processing
-    await enqueue_incident_processing(incident.id)
+    return PhotoUploadResponse(**upload_data)
 
-    return incident
+
+@router.get("/{incident_id}/photo-url", response_model=PhotoDownloadResponse)
+async def get_photo_url(
+    incident_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Generate a presigned S3 GET URL for authorized users (reporter, admin, responder).
+    """
+    result = await db.execute(select(Incident).where(Incident.id == incident_id))
+    incident = result.scalar_one_or_none()
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+
+    if current_user.role.value == "citizen" and incident.reporter_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorised to view this incident photo")
+
+    if not incident.photo_key:
+        raise HTTPException(status_code=404, detail="No photo attached to this incident")
+
+    download_url = generate_presigned_download_url(incident.photo_key, expires_in=300)
+    return PhotoDownloadResponse(photo_url=download_url, photo_key=incident.photo_key)
 
 
 # ── Citizen: own incidents ────────────────────────────────────
@@ -151,6 +253,7 @@ async def get_incident(
 async def update_priority(
     incident_id: int,
     body: PriorityUpdate,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles("admin")),
 ):
@@ -159,8 +262,20 @@ async def update_priority(
     if not incident:
         raise HTTPException(status_code=404, detail="Incident not found")
 
+    old_prio = incident.priority.value if hasattr(incident.priority, 'value') else incident.priority
     incident.priority = body.priority
-    await db.flush()
+    client_ip = request.client.host if request.client else None
+    await record_audit_event(
+        db,
+        action="incident.priority_updated",
+        actor_id=current_user.id,
+        actor_role=current_user.role.value,
+        entity_type="incident",
+        entity_id=incident.id,
+        details={"old_priority": old_prio, "new_priority": body.priority},
+        ip_address=client_ip,
+    )
+    await db.commit()
     await db.refresh(incident)
     return incident
 
@@ -171,6 +286,7 @@ async def update_priority(
 async def assign_team(
     incident_id: int,
     body: AssignTeamRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles("admin")),
 ):
@@ -213,11 +329,32 @@ async def assign_team(
     )
     db.add(history)
 
-    await db.flush()
+    client_ip = request.client.host if request.client else None
+    await record_audit_event(
+        db,
+        action="incident.team_assigned",
+        actor_id=current_user.id,
+        actor_role=current_user.role.value,
+        entity_type="incident",
+        entity_id=incident_id,
+        details={"team_id": team.id, "team_name": team.name},
+        ip_address=client_ip,
+    )
+
+    await db.commit()
     await db.refresh(assignment)
 
-    # AWS stub
-    await notify_status_change(incident_id, "assigned", f"Team {team.name} assigned")
+    # Publish SNS assignment notification
+    cat_val = incident.category.value if hasattr(incident.category, "value") else str(incident.category)
+    prio_val = incident.priority.value if hasattr(incident.priority, "value") else str(incident.priority)
+    await notify_status_change(
+        incident_id=incident_id,
+        new_status="assigned",
+        message=f"Team '{team.name}' assigned by admin",
+        category=cat_val,
+        priority=prio_val,
+        team_name=team.name,
+    )
 
     return assignment
 
@@ -228,6 +365,7 @@ async def assign_team(
 async def update_status(
     incident_id: int,
     body: StatusUpdate,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles("admin", "responder")),
 ):
@@ -260,10 +398,30 @@ async def update_status(
             if team:
                 team.is_available = True
 
-    await db.flush()
+    client_ip = request.client.host if request.client else None
+    await record_audit_event(
+        db,
+        action="incident.status_updated",
+        actor_id=current_user.id,
+        actor_role=current_user.role.value,
+        entity_type="incident",
+        entity_id=incident_id,
+        details={"old_status": old_status, "new_status": body.status, "note": body.note},
+        ip_address=client_ip,
+    )
+
+    await db.commit()
     await db.refresh(incident)
 
-    # AWS stub
-    await notify_status_change(incident_id, body.status, body.note or "")
+    # Publish SNS status transition alert
+    cat_val = incident.category.value if hasattr(incident.category, "value") else str(incident.category)
+    prio_val = incident.priority.value if hasattr(incident.priority, "value") else str(incident.priority)
+    await notify_status_change(
+        incident_id=incident_id,
+        new_status=body.status,
+        message=body.note or "",
+        category=cat_val,
+        priority=prio_val,
+    )
 
     return incident
