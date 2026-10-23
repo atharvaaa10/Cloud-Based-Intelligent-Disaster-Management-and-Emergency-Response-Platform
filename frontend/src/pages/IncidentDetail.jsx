@@ -8,6 +8,7 @@ export default function IncidentDetail() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [incident, setIncident] = useState(null);
+  const [photoUrl, setPhotoUrl] = useState(null);
   const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -26,6 +27,19 @@ export default function IncidentDetail() {
       const data = await api.get(`/incidents/${id}`);
       setIncident(data);
       setNewPriority(data.priority);
+
+      // Fetch presigned photo URL if photo_key is attached
+      if (data.photo_key) {
+        try {
+          const photoData = await api.get(`/incidents/${id}/photo-url`);
+          setPhotoUrl(photoData.photo_url);
+        } catch {
+          // If mock or offline presigned URL, ignore
+        }
+      } else {
+        setPhotoUrl(null);
+      }
+
       if (isAdminOrResponder) {
         const t = await api.get('/teams');
         setTeams(t);
@@ -121,8 +135,54 @@ export default function IncidentDetail() {
                   <div className="value">{incident.reporter.name} ({incident.reporter.email})</div>
                 </div>
               )}
+              {photoUrl && (
+                <div className="detail-field" style={{ marginTop: '1rem' }}>
+                  <div className="label">Emergency Scene Photo (Amazon S3)</div>
+                  <div style={{ marginTop: '.4rem' }}>
+                    <a href={photoUrl} target="_blank" rel="noopener noreferrer">
+                      <img
+                        src={photoUrl}
+                        alt={`Incident #${incident.id} Scene`}
+                        style={{
+                          maxWidth: '100%',
+                          maxHeight: 280,
+                          borderRadius: 'var(--radius-sm)',
+                          border: '1px solid var(--c-surface-3)',
+                          display: 'block',
+                        }}
+                      />
+                    </a>
+                    <small style={{ color: 'var(--c-text-muted)', display: 'block', marginTop: '.3rem' }}>
+                      Key: <code>{incident.photo_key}</code> (Click to open full resolution)
+                    </small>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
+
+          {/* Auto-Triage Assessment details */}
+          {incident.auto_triaged_at && (
+            <div className="card mt-2" style={{ borderLeft: '4px solid #38bdf8' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '.6rem' }}>
+                <h3 style={{ fontSize: '.85rem', fontWeight: 700, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '.04em', margin: 0 }}>
+                  ⚡ Auto-Triage Assessment (SQS + Lambda)
+                </h3>
+                <span className="badge" style={{ background: 'rgba(56, 189, 248, 0.2)', color: '#38bdf8', fontSize: '11px', border: '1px solid rgba(56, 189, 248, 0.4)' }}>
+                  Score: {incident.triage_score ?? 'N/A'} / 100
+                </span>
+              </div>
+              <div className="detail-field">
+                <div className="label">Evaluation Rationale</div>
+                <div className="value" style={{ fontStyle: 'italic', color: 'var(--c-text)' }}>
+                  {incident.triage_reason || 'Evaluated based on emergency category, population scale, and severity keyword signals.'}
+                </div>
+              </div>
+              <small style={{ color: 'var(--c-text-muted)', display: 'block', marginTop: '.4rem' }}>
+                Triaged automatically on: {fmtDate(incident.auto_triaged_at)}
+              </small>
+            </div>
+          )}
 
           {/* Status history timeline */}
           {incident.status_history?.length > 0 && (

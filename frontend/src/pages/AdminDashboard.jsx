@@ -114,7 +114,20 @@ export default function AdminDashboard() {
                   <td style={{ textTransform: 'capitalize' }}>{inc.category.replace('_', ' ')}</td>
                   <td>{inc.location_text}</td>
                   <td>{inc.people_affected}</td>
-                  <td><span className={`badge badge-${inc.priority}`}>{inc.priority}</span></td>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span className={`badge badge-${inc.priority}`}>{inc.priority}</span>
+                      {inc.auto_triaged_at && (
+                        <span
+                          className="badge"
+                          title={`Auto-triaged (Score: ${inc.triage_score ?? 'N/A'})\n${inc.triage_reason || ''}`}
+                          style={{ fontSize: '10px', background: 'rgba(56, 189, 248, 0.2)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.4)' }}
+                        >
+                          ⚡ Auto-triaged
+                        </span>
+                      )}
+                    </div>
+                  </td>
                   <td><span className={`badge badge-${inc.status}`}>{inc.status.replace('_', ' ')}</span></td>
                   <td>{fmtDate(inc.created_at)}</td>
                 </tr>

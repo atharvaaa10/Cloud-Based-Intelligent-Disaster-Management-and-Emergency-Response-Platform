@@ -8,6 +8,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import IncidentDetail from './pages/IncidentDetail';
 import TeamsPage from './pages/TeamsPage';
 import ResourcesPage from './pages/ResourcesPage';
+import AuditLog from './pages/AuditLog';
 import './index.css';
 
 function ProtectedRoute({ children, roles }) {
@@ -46,6 +47,7 @@ function App() {
             <Route path="/admin/incidents/:id" element={<IncidentDetail />} />
             <Route path="/admin/teams" element={<ProtectedRoute roles={['admin']}><TeamsPage /></ProtectedRoute>} />
             <Route path="/admin/resources" element={<ProtectedRoute roles={['admin']}><ResourcesPage /></ProtectedRoute>} />
+            <Route path="/admin/audit-log" element={<ProtectedRoute roles={['admin']}><AuditLog /></ProtectedRoute>} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

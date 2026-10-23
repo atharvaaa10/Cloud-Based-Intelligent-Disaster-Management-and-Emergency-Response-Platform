@@ -47,6 +47,9 @@ export default function AppLayout() {
               <NavLink to="/admin/resources" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
                 <span className="icon">📦</span> Resources
               </NavLink>
+              <NavLink to="/admin/audit-log" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                <span className="icon">📜</span> Audit Log
+              </NavLink>
             </>
           )}
         </nav>
