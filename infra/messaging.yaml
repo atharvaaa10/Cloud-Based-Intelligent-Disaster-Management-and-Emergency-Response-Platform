@@ -1,0 +1,125 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Messaging infrastructure for Disaster Management Platform:
+  Amazon SQS main queue with 60s visibility timeout, long polling, server-side encryption,
+  Dead-Letter Queue (DLQ) with 14-day retention and redrive policy (maxReceiveCount 3),
+  and Amazon SNS topic "disaster-alerts" with optional email subscriber.
+  Free Tier compliant (1,000,000 SQS requests/mo and 1,000,000 SNS publishes/mo free).
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: production
+    Description: Environment name prefix for resources
+
+  AlertEmail:
+    Type: String
+    Default: ""
+    Description: Optional administrative email address to subscribe to disaster alerts (confirm via email upon deployment)
+
+Conditions:
+  HasAlertEmail: !Not [!Equals [!Ref AlertEmail, ""]]
+
+Resources:
+  # ── SQS Dead-Letter Queue (DLQ) (Cost: Free Tier includes 1M requests/mo) ──
+  DisasterQueueDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "disaster-incident-dlq-${EnvironmentName}"
+      # 14-day retention (1,209,600 seconds) gives operators time to inspect poison messages
+      MessageRetentionPeriod: 1209600
+      SqsManagedSseEnabled: true
+      Tags:
+        - Key: Name
+          Value: !Sub "disaster-incident-dlq-${EnvironmentName}"
+        - Key: Project
+          Value: DisasterResponse
+
+  # ── SQS Main Queue (Cost: Free Tier includes 1M requests/mo) ──
+  DisasterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "disaster-incident-queue-${EnvironmentName}"
+      # 60s visibility timeout ensures Lambda (15s timeout) has ample headroom for retries
+      VisibilityTimeout: 60
+      # Long polling (20 seconds) minimizes empty receives and reduces SQS cost
+      ReceiveMessageWaitTimeSeconds: 20
+      SqsManagedSseEnabled: true
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DisasterQueueDLQ.Arn
+        maxReceiveCount: 3
+      Tags:
+        - Key: Name
+          Value: !Sub "disaster-incident-queue-${EnvironmentName}"
+        - Key: Project
+          Value: DisasterResponse
+
+  # ── SNS Topic for Disaster Alerts (Cost: Free Tier includes 1M publishes/mo) ──
+  DisasterAlertsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub "disaster-alerts-${EnvironmentName}"
+      DisplayName: Disaster Emergency Alerts
+      Tags:
+        - Key: Name
+          Value: !Sub "disaster-alerts-${EnvironmentName}"
+        - Key: Project
+          Value: DisasterResponse
+
+  # ── Optional SNS Email Subscription (Cost: Free Tier includes 1,000 email deliveries/mo) ──
+  DisasterAlertsEmailSubscription:
+    Type: AWS::SNS::Subscription
+    Condition: HasAlertEmail
+    Properties:
+      TopicArn: !Ref DisasterAlertsTopic
+      Protocol: email
+      Endpoint: !Ref AlertEmail
+
+Outputs:
+  DisasterQueueUrl:
+    Description: URL of the primary SQS incident processing queue
+    Value: !Ref DisasterQueue
+    Export:
+      Name: !Sub "${AWS::StackName}-DisasterQueueUrl"
+
+  DisasterQueueArn:
+    Description: ARN of the primary SQS incident processing queue
+    Value: !GetAtt DisasterQueue.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-DisasterQueueArn"
+
+  DisasterQueueName:
+    Description: Name of the primary SQS incident queue
+    Value: !GetAtt DisasterQueue.QueueName
+    Export:
+      Name: !Sub "${AWS::StackName}-DisasterQueueName"
+
+  DisasterQueueDLQUrl:
+    Description: URL of the Dead-Letter Queue (DLQ)
+    Value: !Ref DisasterQueueDLQ
+    Export:
+      Name: !Sub "${AWS::StackName}-DisasterQueueDLQUrl"
+
+  DisasterQueueDLQArn:
+    Description: ARN of the Dead-Letter Queue (DLQ)
+    Value: !GetAtt DisasterQueueDLQ.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-DisasterQueueDLQArn"
+
+  DisasterQueueDLQName:
+    Description: Name of the Dead-Letter Queue (DLQ)
+    Value: !GetAtt DisasterQueueDLQ.QueueName
+    Export:
+      Name: !Sub "${AWS::StackName}-DisasterQueueDLQName"
+
+  DisasterAlertsTopicArn:
+    Description: ARN of the SNS topic for emergency alerts and CloudWatch alarms
+    Value: !Ref DisasterAlertsTopic
+    Export:
+      Name: !Sub "${AWS::StackName}-DisasterAlertsTopicArn"
+
+  DisasterAlertsTopicName:
+    Description: Name of the SNS alerts topic
+    Value: !GetAtt DisasterAlertsTopic.TopicName
+    Export:
+      Name: !Sub "${AWS::StackName}-DisasterAlertsTopicName"
