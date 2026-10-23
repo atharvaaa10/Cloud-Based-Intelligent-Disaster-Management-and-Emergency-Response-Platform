@@ -2,10 +2,11 @@
 Authentication routes: register, login, me.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.audit import record_audit_event
 from app.auth import create_access_token, hash_password, verify_password
 from app.database import get_db
 from app.deps import get_current_user
@@ -35,14 +36,33 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
+async def login(body: LoginRequest, request: Request, db: AsyncSession = Depends(get_db)):
     """Authenticate and return a JWT."""
+    client_ip = request.client.host if request.client else None
     result = await db.execute(select(User).where(User.email == body.email))
     user = result.scalar_one_or_none()
     if not user or not verify_password(body.password, user.password_hash):
+        await record_audit_event(
+            db,
+            action="auth.login_failure",
+            details={"email": body.email},
+            ip_address=client_ip,
+        )
+        await db.commit()
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     token = create_access_token({"sub": str(user.id), "role": user.role.value})
+    await record_audit_event(
+        db,
+        action="auth.login_success",
+        actor_id=user.id,
+        actor_role=user.role.value,
+        entity_type="user",
+        entity_id=user.id,
+        details={"email": user.email},
+        ip_address=client_ip,
+    )
+    await db.commit()
     return TokenResponse(access_token=token)
 
 
