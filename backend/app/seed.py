@@ -25,10 +25,16 @@ from app.models import (
     PriorityEnum,
     StatusEnum,
 )
+from app.config import get_settings
 from app.auth import hash_password
 
 
 async def seed():
+    settings = get_settings()
+    is_prod = settings.ENV == "production" or os.getenv("ENV") == "production"
+    if is_prod and not os.getenv("ALLOW_PRODUCTION_SEED"):
+        raise RuntimeError("Refusing to seed default demo passwords in ENV=production! Set custom passwords for production users.")
+
     try:
         # Create all tables (safe for dev; production uses Alembic)
         async with engine.begin() as conn:
@@ -39,7 +45,7 @@ async def seed():
             existing = await session.execute(select(User).where(User.email == "admin@disaster.io"))
             if existing.scalar_one_or_none():
                 print("[INFO] Database already seeded. Skipping duplicate seeding.")
-                return
+                return True
 
             # ── Users ─────────────────────────────────────────────
             admin = User(
@@ -143,5 +149,12 @@ async def seed():
         await engine.dispose()
 
 
+seed_data = seed
+
+
 if __name__ == "__main__":
-    asyncio.run(seed())
+    try:
+        asyncio.run(seed())
+    except RuntimeError as err:
+        print(f"[ERROR] {err}", file=sys.stderr)
+        sys.exit(1)
