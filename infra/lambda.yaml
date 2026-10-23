@@ -1,0 +1,276 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Serverless event-driven processing for Disaster Management Platform:
+  AWS Lambda Python 3.12 auto-triage consumer with SQS Event Source Mapping
+  (batch size 5, ReportBatchItemFailures), least-privilege IAM execution role,
+  CloudWatch Log Group, and CloudWatch Alarms (DLQ depth, queue age, Lambda errors).
+  Free Tier compliant (1,000,000 Lambda invocations/mo + 3.2M sec compute time free).
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: production
+    Description: Environment name prefix for resources
+
+  MessagingStackName:
+    Type: String
+    Default: disaster-messaging
+    Description: Name of the active Messaging CloudFormation stack exporting SQS queue and SNS topic
+
+  ComputeStackName:
+    Type: String
+    Default: disaster-compute
+    Description: Name of the active Compute CloudFormation stack exporting EC2 Public Elastic IP
+
+  StorageStackName:
+    Type: String
+    Default: disaster-storage
+    Description: Name of the active Storage CloudFormation stack exporting S3 bucket details
+
+  LambdaCodeS3Bucket:
+    Type: String
+    Default: ""
+    Description: "Optional S3 bucket containing lambda.zip (leave empty to use the bucket exported from StorageStackName)"
+
+  LambdaCodeS3Key:
+    Type: String
+    Default: lambda.zip
+    Description: S3 object key of the packaged lambda zip artifact
+
+  InternalTokenParamName:
+    Type: String
+    Default: /disaster-platform/internal-token
+    Description: SSM Parameter Store SecureString path holding the internal API token
+
+Conditions:
+  UseStorageStackBucket: !Equals [!Ref LambdaCodeS3Bucket, ""]
+
+Resources:
+  # ── IAM Role for Lambda Execution (Cost: $0.00 / month - IAM roles are free) ──
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "disaster-lambda-role-${EnvironmentName}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      Policies:
+        # 1. Least-privilege SQS consumer permissions
+        - PolicyName: SQSConsumerAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                Resource:
+                  - Fn::ImportValue: !Sub "${MessagingStackName}-DisasterQueueArn"
+
+        # 2. Least-privilege SNS publisher permissions
+        - PolicyName: SNSPublisherAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sns:Publish
+                Resource:
+                  - Fn::ImportValue: !Sub "${MessagingStackName}-DisasterAlertsTopicArn"
+
+        # 3. CloudWatch Logs permissions
+        - PolicyName: CloudWatchLogsAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/disaster-triage-handler-${EnvironmentName}*"
+
+        # 4. SSM Parameter Store read access for internal API token
+        - PolicyName: SSMInternalTokenAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${InternalTokenParamName}"
+              - Effect: Allow
+                Action:
+                  - kms:Decrypt
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    kms:CallerAccount: !Ref "AWS::AccountId"
+
+      Tags:
+        - Key: Name
+          Value: !Sub "disaster-lambda-role-${EnvironmentName}"
+        - Key: Project
+          Value: DisasterResponse
+
+  # ── CloudWatch Log Group for Lambda (Cost: Free Tier includes 5 GB ingestion/mo) ──
+  LambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/disaster-triage-handler-${EnvironmentName}"
+      RetentionInDays: 14
+      Tags:
+        - Key: Project
+          Value: DisasterResponse
+
+  # ── Lambda Function (Cost: Free Tier includes 1M requests + 400,000 GB-s compute/mo) ──
+  TriageFunction:
+    Type: AWS::Lambda::Function
+    DependsOn:
+      - LambdaLogGroup
+    Properties:
+      FunctionName: !Sub "disaster-triage-handler-${EnvironmentName}"
+      Description: Consumes SQS incident events, computes auto-triage score, calls internal API, and publishes SNS alerts
+      Runtime: python3.12
+      Handler: lambda_function.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 15
+      MemorySize: 128
+      Code:
+        S3Bucket:
+          !If
+            - UseStorageStackBucket
+            - Fn::ImportValue: !Sub "${StorageStackName}-PhotoBucketName"
+            - !Ref LambdaCodeS3Bucket
+        S3Key: !Ref LambdaCodeS3Key
+      Environment:
+        Variables:
+          API_BASE_URL:
+            !Sub
+              - "http://${PublicIp}"
+              - PublicIp:
+                  Fn::ImportValue: !Sub "${ComputeStackName}-PublicIp"
+          SNS_TOPIC_ARN:
+            Fn::ImportValue: !Sub "${MessagingStackName}-DisasterAlertsTopicArn"
+          INTERNAL_TOKEN_PARAM_NAME: !Ref InternalTokenParamName
+      Tags:
+        - Key: Name
+          Value: !Sub "disaster-triage-handler-${EnvironmentName}"
+        - Key: Project
+          Value: DisasterResponse
+
+  # ── SQS Event Source Mapping with Partial Batch Response ──
+  # (Cost: $0.00 / month - Event source mappings are free)
+  TriageEventSourceMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      EventSourceArn:
+        Fn::ImportValue: !Sub "${MessagingStackName}-DisasterQueueArn"
+      FunctionName: !Ref TriageFunction
+      BatchSize: 5
+      # ReportBatchItemFailures ensures that if 1 of 5 records fails, only that 1 is retried
+      FunctionResponseTypes:
+        - ReportBatchItemFailures
+      Enabled: true
+
+  # ── CloudWatch Alarm: Dead-Letter Queue (DLQ) Depth > 0 ──
+  # (Cost: Free Tier includes 10 standard alarms)
+  DLQMessagesAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "disaster-dlq-messages-alarm-${EnvironmentName}"
+      AlarmDescription: Triggers when messages enter the Dead-Letter Queue indicating poisoned or unprocessable events
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      Dimensions:
+        - Name: QueueName
+          Value:
+            Fn::ImportValue: !Sub "${MessagingStackName}-DisasterQueueDLQName"
+      Statistic: Sum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      AlarmActions:
+        - Fn::ImportValue: !Sub "${MessagingStackName}-DisasterAlertsTopicArn"
+      TreatMissingData: notBreaching
+      Tags:
+        - Key: Project
+          Value: DisasterResponse
+
+  # ── CloudWatch Alarm: Queue Age of Oldest Message > 5 minutes (300 seconds) ──
+  # (Cost: Free Tier includes 10 standard alarms)
+  QueueAgeAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "disaster-queue-age-alarm-${EnvironmentName}"
+      AlarmDescription: Triggers when messages dwell in the primary queue for over 5 minutes indicating triage backlog
+      Namespace: AWS/SQS
+      MetricName: ApproximateAgeOfOldestMessage
+      Dimensions:
+        - Name: QueueName
+          Value:
+            Fn::ImportValue: !Sub "${MessagingStackName}-DisasterQueueName"
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 300
+      ComparisonOperator: GreaterThanThreshold
+      AlarmActions:
+        - Fn::ImportValue: !Sub "${MessagingStackName}-DisasterAlertsTopicArn"
+      TreatMissingData: notBreaching
+      Tags:
+        - Key: Project
+          Value: DisasterResponse
+
+  # ── CloudWatch Alarm: Lambda Execution Errors > 0 ──
+  # (Cost: Free Tier includes 10 standard alarms)
+  LambdaErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "disaster-lambda-errors-alarm-${EnvironmentName}"
+      AlarmDescription: Triggers when the Lambda triage function encounters runtime or unhandled execution errors
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref TriageFunction
+      Statistic: Sum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      AlarmActions:
+        - Fn::ImportValue: !Sub "${MessagingStackName}-DisasterAlertsTopicArn"
+      TreatMissingData: notBreaching
+      Tags:
+        - Key: Project
+          Value: DisasterResponse
+
+Outputs:
+  FunctionArn:
+    Description: ARN of the Lambda Auto-Triage function
+    Value: !GetAtt TriageFunction.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-FunctionArn"
+
+  FunctionName:
+    Description: Name of the Lambda Auto-Triage function
+    Value: !Ref TriageFunction
+    Export:
+      Name: !Sub "${AWS::StackName}-FunctionName"
+
+  FunctionRoleArn:
+    Description: ARN of the execution role assumed by the Lambda function
+    Value: !GetAtt LambdaExecutionRole.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-FunctionRoleArn"
