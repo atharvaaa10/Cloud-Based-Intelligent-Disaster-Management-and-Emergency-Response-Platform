@@ -1,0 +1,250 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Operational monitoring and alerting infrastructure for Disaster Management Platform:
+  CloudWatch Dashboard (EC2, RDS, SQS, DLQ, Lambda, S3 metrics) and automated CloudWatch Alarms
+  for EC2 high CPU, RDS low storage space, and application health check failures.
+  Free Tier compliant: 3 free dashboards, 10 free metric alarms, all alarms notify SNS topic.
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: production
+    Description: Environment name prefix for resources
+
+  ComputeStackName:
+    Type: String
+    Default: disaster-compute
+    Description: Active Compute CloudFormation stack exporting EC2 InstanceId and AppLogGroupName
+
+  DatabaseStackName:
+    Type: String
+    Default: disaster-database
+    Description: Active Database CloudFormation stack exporting RDS DBInstanceIdentifier
+
+  MessagingStackName:
+    Type: String
+    Default: disaster-messaging
+    Description: Active Messaging CloudFormation stack exporting SQS Queues and SNS Topic ARN
+
+  LambdaStackName:
+    Type: String
+    Default: disaster-lambda
+    Description: Active Lambda CloudFormation stack exporting Triage Function Name
+
+Resources:
+  # ── CloudWatch Metric Filter for Application Health / 5xx Errors ─
+  # Cost: $0.00 / month - Metric filters are a free feature of CloudWatch Logs
+  AppHealthErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName:
+        Fn::ImportValue: !Sub "${ComputeStackName}-AppLogGroupName"
+      FilterPattern: '?ERROR ?500 ?"Internal Server Error" ?"Health check failed" ?"unhealthy"'
+      MetricTransformations:
+        - MetricNamespace: DisasterPlatform/Application
+          MetricName: HealthCheckErrors
+          MetricValue: "1"
+          DefaultValue: 0
+
+  # ── CloudWatch Alarm: Application Health Check / Error Rate ─────
+  # Cost: Free Tier includes 10 standard metric alarms free forever
+  AppHealthAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "disaster-app-health-failure-${EnvironmentName}"
+      AlarmDescription: "Alerts when the application logs multiple 5xx or health check failure errors"
+      MetricName: HealthCheckErrors
+      Namespace: DisasterPlatform/Application
+      Statistic: Sum
+      Period: 60
+      EvaluationPeriods: 2
+      Threshold: 2
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - Fn::ImportValue: !Sub "${MessagingStackName}-DisasterAlertsTopicArn"
+
+  # ── CloudWatch Alarm: EC2 CPU > 80% for 10 minutes ──────────────
+  # Cost: Free Tier includes 10 standard metric alarms free forever
+  Ec2HighCpuAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "disaster-ec2-high-cpu-${EnvironmentName}"
+      AlarmDescription: "Alerts when web application EC2 instance CPU utilization exceeds 80% for 10 minutes"
+      MetricName: CPUUtilization
+      Namespace: AWS/EC2
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 80
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: missing
+      Dimensions:
+        - Name: InstanceId
+          Value:
+            Fn::ImportValue: !Sub "${ComputeStackName}-InstanceId"
+      AlarmActions:
+        - Fn::ImportValue: !Sub "${MessagingStackName}-DisasterAlertsTopicArn"
+
+  # ── CloudWatch Alarm: RDS Low Free Storage Space (< 2 GB) ───────
+  # Cost: Free Tier includes 10 standard metric alarms free forever
+  RdsLowStorageAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "disaster-rds-low-storage-${EnvironmentName}"
+      AlarmDescription: "Alerts when RDS PostgreSQL database has less than 2 GB free disk space remaining"
+      MetricName: FreeStorageSpace
+      Namespace: AWS/RDS
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 2147483648 # 2 GB in bytes
+      ComparisonOperator: LessThanOrEqualToThreshold
+      TreatMissingData: breaching
+      Dimensions:
+        - Name: DBInstanceIdentifier
+          Value:
+            Fn::ImportValue: !Sub "${DatabaseStackName}-DbInstanceIdentifier"
+      AlarmActions:
+        - Fn::ImportValue: !Sub "${MessagingStackName}-DisasterAlertsTopicArn"
+
+  # ── Comprehensive CloudWatch Operational Dashboard ─────────────
+  # Cost: $0.00 / month - AWS Free Tier includes up to 3 dashboards free with up to 50 metrics each
+  OperationsDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub "DisasterPlatform-Operations-${EnvironmentName}"
+      DashboardBody:
+        Fn::Sub:
+          - |
+            {
+              "widgets": [
+                {
+                  "type": "metric",
+                  "x": 0,
+                  "y": 0,
+                  "width": 12,
+                  "height": 6,
+                  "properties": {
+                    "metrics": [
+                      [ "AWS/EC2", "CPUUtilization", "InstanceId", "${Ec2InstanceId}", { "label": "EC2 CPU Utilization %", "color": "#ff7f0e" } ]
+                    ],
+                    "view": "timeSeries",
+                    "stacked": false,
+                    "region": "${AWS::Region}",
+                    "title": "EC2 Web Server CPU Utilization",
+                    "period": 300,
+                    "stat": "Average"
+                  }
+                },
+                {
+                  "type": "metric",
+                  "x": 12,
+                  "y": 0,
+                  "width": 12,
+                  "height": 6,
+                  "properties": {
+                    "metrics": [
+                      [ "AWS/RDS", "CPUUtilization", "DBInstanceIdentifier", "${RdsInstanceId}", { "label": "RDS CPU %", "color": "#1f77b4" } ],
+                      [ ".", "DatabaseConnections", ".", ".", { "label": "DB Connections", "yAxis": "right", "color": "#2ca02c" } ]
+                    ],
+                    "view": "timeSeries",
+                    "stacked": false,
+                    "region": "${AWS::Region}",
+                    "title": "RDS Database CPU & Connections",
+                    "period": 300
+                  }
+                },
+                {
+                  "type": "metric",
+                  "x": 0,
+                  "y": 6,
+                  "width": 12,
+                  "height": 6,
+                  "properties": {
+                    "metrics": [
+                      [ "AWS/SQS", "ApproximateNumberOfMessagesVisible", "QueueName", "${MainQueueName}", { "label": "SQS Queue Depth", "color": "#9467bd" } ],
+                      [ ".", "ApproximateAgeOfOldestMessage", ".", ".", { "label": "Age of Oldest Message (s)", "yAxis": "right", "color": "#e377c2" } ]
+                    ],
+                    "view": "timeSeries",
+                    "stacked": false,
+                    "region": "${AWS::Region}",
+                    "title": "SQS Ingestion Queue Depth & Age",
+                    "period": 60
+                  }
+                },
+                {
+                  "type": "metric",
+                  "x": 12,
+                  "y": 6,
+                  "width": 12,
+                  "height": 6,
+                  "properties": {
+                    "metrics": [
+                      [ "AWS/SQS", "ApproximateNumberOfMessagesVisible", "QueueName", "${DlqName}", { "label": "DLQ Depth (Dead Letters)", "color": "#d62728" } ]
+                    ],
+                    "view": "timeSeries",
+                    "stacked": false,
+                    "region": "${AWS::Region}",
+                    "title": "SQS Dead-Letter Queue (DLQ) Depth",
+                    "period": 60
+                  }
+                },
+                {
+                  "type": "metric",
+                  "x": 0,
+                  "y": 12,
+                  "width": 12,
+                  "height": 6,
+                  "properties": {
+                    "metrics": [
+                      [ "AWS/Lambda", "Invocations", "FunctionName", "${LambdaFunctionName}", { "label": "Lambda Invocations", "stat": "Sum", "color": "#17becf" } ],
+                      [ ".", "Errors", ".", ".", { "label": "Lambda Errors", "stat": "Sum", "color": "#d62728" } ]
+                    ],
+                    "view": "timeSeries",
+                    "stacked": false,
+                    "region": "${AWS::Region}",
+                    "title": "Lambda Auto-Triage Invocations & Errors",
+                    "period": 60
+                  }
+                },
+                {
+                  "type": "metric",
+                  "x": 12,
+                  "y": 12,
+                  "width": 12,
+                  "height": 6,
+                  "properties": {
+                    "metrics": [
+                      [ "DisasterPlatform/Application", "HealthCheckErrors", { "label": "Health Check / 5xx Errors", "stat": "Sum", "color": "#d62728" } ]
+                    ],
+                    "view": "timeSeries",
+                    "stacked": false,
+                    "region": "${AWS::Region}",
+                    "title": "Application Health & 5xx Errors",
+                    "period": 60
+                  }
+                }
+              ]
+            }
+          - Ec2InstanceId:
+              Fn::ImportValue: !Sub "${ComputeStackName}-InstanceId"
+            RdsInstanceId:
+              Fn::ImportValue: !Sub "${DatabaseStackName}-DbInstanceIdentifier"
+            MainQueueName:
+              Fn::ImportValue: !Sub "${MessagingStackName}-DisasterQueueName"
+            DlqName:
+              Fn::ImportValue: !Sub "${MessagingStackName}-DisasterDlqName"
+            LambdaFunctionName:
+              Fn::ImportValue: !Sub "${LambdaStackName}-TriageFunctionName"
+
+Outputs:
+  DashboardName:
+    Description: Name of the operational CloudWatch dashboard
+    Value: !Ref OperationsDashboard
+    Export:
+      Name: !Sub "${AWS::StackName}-DashboardName"
+
+  DashboardURL:
+    Description: Direct URL to the operational CloudWatch dashboard
+    Value: !Sub "https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=DisasterPlatform-Operations-${EnvironmentName}"

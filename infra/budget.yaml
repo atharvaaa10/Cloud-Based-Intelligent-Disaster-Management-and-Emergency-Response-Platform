@@ -1,0 +1,82 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Cost budget and alerting infrastructure for Disaster Management Platform:
+  AWS Budgets monthly limit ($5.00 default) with automated SNS / email notifications
+  at 50% ($2.50) and 100% ($5.00) spend thresholds.
+  Free Tier compliant: AWS provides the first two budgets free of charge.
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: production
+    Description: Environment name prefix for resources
+
+  BudgetLimitAmount:
+    Type: Number
+    Default: 5
+    MinValue: 1
+    MaxValue: 100
+    Description: Monthly budget limit in USD
+
+  AlertEmail:
+    Type: String
+    Description: Email address to receive budget threshold alert notifications
+    AllowedPattern: "^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9-.]+$"
+    ConstraintDescription: Must be a valid email address
+
+Resources:
+  # ── Monthly Cost Budget ───────────────────────────────────────
+  # Cost: $0.00 / month - AWS Free Tier includes 2 free budgets per account forever
+  MonthlyCostBudget:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetName: !Sub "disaster-platform-monthly-budget-${EnvironmentName}"
+        BudgetType: COST
+        TimeUnit: MONTHLY
+        BudgetLimit:
+          Amount: !Ref BudgetLimitAmount
+          Unit: USD
+      NotificationsWithSubscribers:
+        # Alert 1: 50% actual spend threshold ($2.50)
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 50
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref AlertEmail
+
+        # Alert 2: 100% actual spend threshold ($5.00)
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 100
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref AlertEmail
+
+        # Alert 3: 100% forecasted spend threshold (early warning)
+        - Notification:
+            NotificationType: FORECASTED
+            ComparisonOperator: GREATER_THAN
+            Threshold: 100
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref AlertEmail
+
+Outputs:
+  BudgetName:
+    Description: Name of the configured monthly cost budget
+    Value: !Ref MonthlyCostBudget
+    Export:
+      Name: !Sub "${AWS::StackName}-BudgetName"
+
+  BudgetLimit:
+    Description: Monthly budget ceiling in USD
+    Value: !Sub "$${BudgetLimitAmount} USD"
+    Export:
+      Name: !Sub "${AWS::StackName}-BudgetLimit"
