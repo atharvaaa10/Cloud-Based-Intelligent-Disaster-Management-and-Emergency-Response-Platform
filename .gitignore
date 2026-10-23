@@ -25,3 +25,4 @@ frontend/dist/
 dist/
 .DS_Store
 Thumbs.db
+lambda/*.zip

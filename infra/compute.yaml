@@ -1,0 +1,373 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Compute infrastructure for Disaster Management Platform:
+  EC2 instance (Amazon Linux 2023, t3.micro) with Elastic IP, IAM instance role
+  (least-privilege S3 photo access, Secrets Manager DB secret retrieval, CloudWatch logs),
+  and automated UserData installation of Docker, Docker Compose, Git, and container orchestration.
+  Free Tier compliant (t3.micro 750 hrs/month, 20 GB gp3 root EBS volume).
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: production
+    Description: Environment name prefix for resources
+
+  NetworkStackName:
+    Type: String
+    Default: disaster-network
+    Description: Name of the active Network CloudFormation stack exporting VPC subnets and security groups
+
+  StorageStackName:
+    Type: String
+    Default: disaster-storage
+    Description: Name of the active Storage CloudFormation stack exporting S3 bucket details
+
+  DatabaseStackName:
+    Type: String
+    Default: disaster-database
+    Description: Name of the active Database CloudFormation stack exporting RDS endpoint and Secrets Manager secret ARN
+
+  MessagingStackName:
+    Type: String
+    Default: disaster-messaging
+    Description: Name of the active Messaging CloudFormation stack exporting SQS queue and SNS topic
+
+  InstanceType:
+    Type: String
+    Default: t3.micro
+    AllowedValues:
+      - t3.micro
+      - t2.micro
+    Description: "EC2 instance type (Free Tier eligible: t3.micro / t2.micro)"
+
+  LatestAmiId:
+    Type: "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>"
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
+    Description: SSM parameter path resolving to the latest Amazon Linux 2023 x86_64 AMI ID
+
+  KeyName:
+    Type: String
+    Default: ""
+    Description: Optional EC2 KeyPair name for SSH access (leave empty if using SSM Session Manager)
+
+  GitRepoUrl:
+    Type: String
+    Default: https://github.com/atharvaaa10/Cloud-Based-Intelligent-Disaster-Management-and-Emergency-Response-Platform.git
+    Description: Git repository URL containing the production application and docker-compose.prod.yml
+
+  InternalTokenParamName:
+    Type: String
+    Default: /disaster-platform/internal-token
+    Description: SSM Parameter Store SecureString path holding the internal API token
+
+Conditions:
+  HasKeyName: !Not [!Equals [!Ref KeyName, ""]]
+
+Resources:
+  # ── IAM Role for EC2 (Cost: $0.00 / month - IAM roles and policies are free) ──
+  AppInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "disaster-ec2-role-${EnvironmentName}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      ManagedPolicyArns:
+        # AWS Systems Manager access for secure shell access without opening port 22
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        # 1. Least-privilege S3 access: Only incidents/* prefix in the dedicated storage bucket
+        - PolicyName: S3PhotoStorageAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:DeleteObject
+                Resource:
+                  - !Sub
+                    - "${BucketArn}/incidents/*"
+                    - BucketArn:
+                        Fn::ImportValue: !Sub "${StorageStackName}-PhotoBucketArn"
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource:
+                  - Fn::ImportValue: !Sub "${StorageStackName}-PhotoBucketArn"
+                Condition:
+                  StringLike:
+                    s3:prefix:
+                      - "incidents/*"
+
+        # 2. Least-privilege Secrets Manager: Read only the RDS Master User Secret
+        - PolicyName: SecretsManagerDbSecretAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:DescribeSecret
+                Resource:
+                  - Fn::ImportValue: !Sub "${DatabaseStackName}-DbSecretArn"
+
+        # 3. CloudWatch Logging: App and system container logging
+        - PolicyName: CloudWatchLogsAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - logs:DescribeLogStreams
+                Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/disaster-platform/*"
+
+        # 4. Least-privilege SQS publisher access: Enqueue incident created events
+        - PolicyName: SQSIncidentQueueAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:SendMessage
+                  - sqs:GetQueueUrl
+                  - sqs:GetQueueAttributes
+                Resource:
+                  - Fn::ImportValue: !Sub "${MessagingStackName}-DisasterQueueArn"
+
+        # 5. Least-privilege SNS publisher access: Publish incident status alerts
+        - PolicyName: SNSTopicAlertsAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sns:Publish
+                Resource:
+                  - Fn::ImportValue: !Sub "${MessagingStackName}-DisasterAlertsTopicArn"
+
+        # 6. Least-privilege SSM Parameter Store access: Read the internal token
+        - PolicyName: SSMInternalTokenAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${InternalTokenParamName}"
+              - Effect: Allow
+                Action:
+                  - kms:Decrypt
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    kms:CallerAccount: !Ref "AWS::AccountId"
+
+      Tags:
+        - Key: Name
+          Value: !Sub "disaster-ec2-role-${EnvironmentName}"
+        - Key: Project
+          Value: DisasterResponse
+
+  # ── IAM Instance Profile (Cost: $0.00 / month - Instance profiles are free) ──
+  AppInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles:
+        - !Ref AppInstanceRole
+
+  # ── CloudWatch Log Group (Cost: Free Tier includes 5 GB ingestion/storage) ──
+  AppLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/disaster-platform/${EnvironmentName}"
+      RetentionInDays: 14
+      Tags:
+        - Key: Project
+          Value: DisasterResponse
+
+  # ── EC2 Virtual Machine (Cost: Free Tier eligible: 750 hours/month t3.micro for 12 months) ──
+  AppInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      ImageId: !Ref LatestAmiId
+      SubnetId:
+        Fn::ImportValue: !Sub "${NetworkStackName}-PublicSubnetId"
+      SecurityGroupIds:
+        - Fn::ImportValue: !Sub "${NetworkStackName}-WebSecurityGroupId"
+      IamInstanceProfile: !Ref AppInstanceProfile
+      KeyName: !If [HasKeyName, !Ref KeyName, !Ref "AWS::NoValue"]
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeSize: 20
+            VolumeType: gp3
+            Encrypted: true
+            DeleteOnTermination: true
+      UserData:
+        Fn::Base64: !Sub
+          - |
+            #!/bin/bash
+            set -euxo pipefail
+            exec > >(tee -a /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
+
+            echo "=== [1/6] Updating OS and installing prerequisite packages ==="
+            dnf update -y
+            dnf install -y docker git jq curl
+
+            echo "=== [2/6] Configuring Docker and awslogs driver for CloudWatch ==="
+            mkdir -p /etc/docker
+            cat <<DOCKER_EOF > /etc/docker/daemon.json
+            {
+              "log-driver": "awslogs",
+              "log-opts": {
+                "awslogs-region": "${AWS::Region}",
+                "awslogs-group": "/disaster-platform/${EnvironmentName}",
+                "awslogs-create-group": "false"
+              }
+            }
+            DOCKER_EOF
+
+            systemctl start docker
+            systemctl enable docker
+            usermod -aG docker ec2-user
+
+            echo "=== [3/6] Installing Docker Compose CLI plugin ==="
+            DOCKER_CLI_DIR=/usr/local/lib/docker/cli-plugins
+            mkdir -p "$DOCKER_CLI_DIR"
+            curl -sSL "https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-x86_64" -o "$DOCKER_CLI_DIR/docker-compose"
+            chmod +x "$DOCKER_CLI_DIR/docker-compose"
+            ln -sf "$DOCKER_CLI_DIR/docker-compose" /usr/bin/docker-compose
+
+            echo "=== [4/6] Retrieving RDS credentials from Secrets Manager ==="
+            SECRET_ARN="${DbSecretArn}"
+            AWS_REGION="${AWS::Region}"
+            DB_ENDPOINT="${DbEndpoint}"
+            DB_NAME="${DbName}"
+            BUCKET_NAME="${BucketName}"
+
+            SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id "$SECRET_ARN" --region "$AWS_REGION" --query SecretString --output text)
+            DB_USER=$(echo "$SECRET_JSON" | jq -r .username)
+            DB_PASS=$(echo "$SECRET_JSON" | jq -r .password)
+
+            # URL-encode the DB password for asyncpg connection string safety
+            ENCODED_DB_PASS=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote_plus('$DB_PASS'))")
+            DATABASE_URL="postgresql+asyncpg://${!DB_USER}:${!ENCODED_DB_PASS}@${!DB_ENDPOINT}:5432/${!DB_NAME}"
+
+            # Generate secure random JWT Secret Key and retrieve internal service token from SSM
+            JWT_SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))")
+            echo "=== [4b/6] Retrieving internal token from SSM Parameter Store ==="
+            INTERNAL_TOKEN=$(aws ssm get-parameter --name "${InternalTokenParamName}" --with-decryption --region "$AWS_REGION" --query Parameter.Value --output text 2>/dev/null || python3 -c "import secrets; print(secrets.token_urlsafe(32))")
+            SQS_QUEUE_URL="${QueueUrl}"
+            SNS_TOPIC_ARN="${TopicArn}"
+
+            echo "=== [5/6] Cloning application repository ==="
+            APP_DIR="/opt/disaster-platform"
+            mkdir -p "$APP_DIR"
+            git clone "${GitRepoUrl}" "$APP_DIR" || {
+              echo "Git clone failed or repo already exists; fetching latest"
+              cd "$APP_DIR" && git pull || true
+            }
+
+            cd "$APP_DIR"
+
+            echo "=== [6/6] Generating production .env file and starting containers ==="
+            cat <<EOF > .env
+            ENV=production
+            USE_AWS=true
+            AWS_REGION=$AWS_REGION
+            S3_BUCKET_NAME=$BUCKET_NAME
+            SECRET_KEY=$JWT_SECRET_KEY
+            INTERNAL_TOKEN=$INTERNAL_TOKEN
+            SQS_QUEUE_URL=$SQS_QUEUE_URL
+            SNS_TOPIC_ARN=$SNS_TOPIC_ARN
+            DATABASE_URL=$DATABASE_URL
+            CORS_ORIGINS=["*"]
+            VITE_API_URL=/api
+            EOF
+
+            chown -R ec2-user:ec2-user "$APP_DIR"
+
+            # Launch Docker Compose production stack (backend with auto-migrations + nginx SPA)
+            docker compose -f docker-compose.prod.yml up -d --build
+
+            echo "=== Deployment bootstrap completed successfully at $(date) ==="
+          - DbSecretArn:
+              Fn::ImportValue: !Sub "${DatabaseStackName}-DbSecretArn"
+            DbEndpoint:
+              Fn::ImportValue: !Sub "${DatabaseStackName}-DbEndpointAddress"
+            DbName:
+              Fn::ImportValue: !Sub "${DatabaseStackName}-DbName"
+            BucketName:
+              Fn::ImportValue: !Sub "${StorageStackName}-PhotoBucketName"
+            QueueUrl:
+              Fn::ImportValue: !Sub "${MessagingStackName}-DisasterQueueUrl"
+            TopicArn:
+              Fn::ImportValue: !Sub "${MessagingStackName}-DisasterAlertsTopicArn"
+            InternalTokenParamName: !Ref InternalTokenParamName
+            GitRepoUrl: !Ref GitRepoUrl
+
+      Tags:
+        - Key: Name
+          Value: !Sub "disaster-web-app-${EnvironmentName}"
+        - Key: Project
+          Value: DisasterResponse
+
+  # ── Elastic IP (Cost: Free while attached to a running EC2 instance) ──
+  AppElasticIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: !Sub "disaster-eip-${EnvironmentName}"
+        - Key: Project
+          Value: DisasterResponse
+
+  # ── EIP Association (Cost: $0.00 / month) ──
+  AppElasticIPAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      InstanceId: !Ref AppInstance
+      AllocationId: !GetAtt AppElasticIP.AllocationId
+
+Outputs:
+  InstanceId:
+    Description: EC2 Instance ID hosting the Disaster Management Platform
+    Value: !Ref AppInstance
+    Export:
+      Name: !Sub "${AWS::StackName}-InstanceId"
+
+  PublicIp:
+    Description: Static Elastic IP address assigned to the web instance
+    Value: !Ref AppElasticIP
+    Export:
+      Name: !Sub "${AWS::StackName}-PublicIp"
+
+  WebsiteURL:
+    Description: HTTP URL to access the Disaster Management Platform web application
+    Value: !Sub "http://${AppElasticIP}"
+
+  HealthCheckURL:
+    Description: Direct endpoint to monitor application and database health status
+    Value: !Sub "http://${AppElasticIP}/api/health"
+
+  AppLogGroupName:
+    Description: Name of the CloudWatch Log Group storing application logs
+    Value: !Ref AppLogGroup
+    Export:
+      Name: !Sub "${AWS::StackName}-AppLogGroupName"
+
