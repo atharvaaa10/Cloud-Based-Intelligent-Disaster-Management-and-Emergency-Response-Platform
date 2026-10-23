@@ -1,0 +1,237 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Network infrastructure for Disaster Management Platform:
+  VPC, 1 Public Subnet, 2 Private Subnets (Multi-AZ for RDS),
+  Internet Gateway, Route Tables, and Web/DB Security Groups.
+  Free Tier compliant (No NAT Gateway).
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: production
+    Description: Environment name prefix for resources (e.g. production, staging)
+
+  VpcCidr:
+    Type: String
+    Default: 10.0.0.0/16
+    Description: CIDR block for the overall VPC
+
+  PublicSubnetCidr:
+    Type: String
+    Default: 10.0.1.0/24
+    Description: CIDR block for the public subnet hosting the EC2 web server
+
+  PrivateSubnet1Cidr:
+    Type: String
+    Default: 10.0.10.0/24
+    Description: CIDR block for private subnet 1 (AZ A) for RDS PostgreSQL
+
+  PrivateSubnet2Cidr:
+    Type: String
+    Default: 10.0.11.0/24
+    Description: CIDR block for private subnet 2 (AZ B) for RDS PostgreSQL
+
+  MyIpCidr:
+    Type: String
+    Default: 0.0.0.0/0
+    Description: CIDR range allowed for administrative SSH access (e.g. 203.0.113.25/32)
+
+Resources:
+  # ── VPC (Cost: $0.00 / month - AWS VPC is free) ───────────────
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub "disaster-vpc-${EnvironmentName}"
+        - Key: Project
+          Value: DisasterResponse
+
+  # ── Internet Gateway (Cost: $0.00 / month - IGW is free) ──────
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "disaster-igw-${EnvironmentName}"
+        - Key: Project
+          Value: DisasterResponse
+
+  VPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  # ── Public Subnet for EC2 (Cost: $0.00 / month) ───────────────
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PublicSubnetCidr
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub "disaster-public-subnet-${EnvironmentName}"
+        - Key: Project
+          Value: DisasterResponse
+
+  # ── Private Subnets for RDS (Cost: $0.00 / month) ─────────────
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PrivateSubnet1Cidr
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub "disaster-private-subnet-1-${EnvironmentName}"
+        - Key: Project
+          Value: DisasterResponse
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PrivateSubnet2Cidr
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub "disaster-private-subnet-2-${EnvironmentName}"
+        - Key: Project
+          Value: DisasterResponse
+
+  # ── Route Tables (Cost: $0.00 / month) ────────────────────────
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "disaster-public-rt-${EnvironmentName}"
+        - Key: Project
+          Value: DisasterResponse
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: VPCGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "disaster-private-rt-${EnvironmentName}"
+        - Key: Project
+          Value: DisasterResponse
+
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet1
+      RouteTableId: !Ref PrivateRouteTable
+
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet2
+      RouteTableId: !Ref PrivateRouteTable
+
+  # ── Security Groups (Cost: $0.00 / month - SGs are free) ─────
+  WebSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow HTTP, HTTPS, and restricted SSH to EC2 instance
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+          Description: Allow HTTP inbound from internet
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: Allow HTTPS inbound from internet
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref MyIpCidr
+          Description: Allow SSH inbound from administrator IP
+      Tags:
+        - Key: Name
+          Value: !Sub "disaster-web-sg-${EnvironmentName}"
+        - Key: Project
+          Value: DisasterResponse
+
+  DbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow PostgreSQL inbound exclusively from WebSecurityGroup
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref WebSecurityGroup
+          Description: Allow PostgreSQL 5432 access only from Web EC2 instance
+      Tags:
+        - Key: Name
+          Value: !Sub "disaster-db-sg-${EnvironmentName}"
+        - Key: Project
+          Value: DisasterResponse
+
+Outputs:
+  VpcId:
+    Description: VPC identifier
+    Value: !Ref VPC
+    Export:
+      Name: !Sub "${AWS::StackName}-VpcId"
+
+  PublicSubnetId:
+    Description: Public subnet identifier for EC2 compute
+    Value: !Ref PublicSubnet
+    Export:
+      Name: !Sub "${AWS::StackName}-PublicSubnetId"
+
+  PrivateSubnet1Id:
+    Description: First private subnet identifier for RDS DB Subnet Group
+    Value: !Ref PrivateSubnet1
+    Export:
+      Name: !Sub "${AWS::StackName}-PrivateSubnet1Id"
+
+  PrivateSubnet2Id:
+    Description: Second private subnet identifier for RDS DB Subnet Group
+    Value: !Ref PrivateSubnet2
+    Export:
+      Name: !Sub "${AWS::StackName}-PrivateSubnet2Id"
+
+  WebSecurityGroupId:
+    Description: Security group for EC2 web instance
+    Value: !Ref WebSecurityGroup
+    Export:
+      Name: !Sub "${AWS::StackName}-WebSecurityGroupId"
+
+  DbSecurityGroupId:
+    Description: Security group for RDS PostgreSQL database
+    Value: !Ref DbSecurityGroup
+    Export:
+      Name: !Sub "${AWS::StackName}-DbSecurityGroupId"

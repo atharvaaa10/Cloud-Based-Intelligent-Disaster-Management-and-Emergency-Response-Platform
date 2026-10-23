@@ -1,0 +1,122 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Database infrastructure for Disaster Management Platform:
+  Amazon RDS PostgreSQL 15 in isolated private subnets, encrypted storage,
+  automated password management via AWS Secrets Manager.
+  Free Tier compliant (db.t3.micro, Single-AZ, 20 GB storage).
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: production
+    Description: Environment name prefix for resources
+
+  NetworkStackName:
+    Type: String
+    Default: disaster-network
+    Description: Name of the active Network CloudFormation stack exporting VPC subnets and security groups
+
+  DbInstanceClass:
+    Type: String
+    Default: db.t3.micro
+    AllowedValues:
+      - db.t3.micro
+      - db.t4g.micro
+    Description: "RDS instance class (Free Tier eligible: db.t3.micro / db.t4g.micro)"
+
+  DbAllocatedStorage:
+    Type: Number
+    Default: 20
+    MinValue: 20
+    MaxValue: 100
+    Description: Allocated SSD storage in GB (Free Tier includes 20 GB gp2/gp3)
+
+  DbName:
+    Type: String
+    Default: disaster_db
+    Description: Initial database name created on the RDS instance
+
+  DbMasterUsername:
+    Type: String
+    Default: disaster_admin
+    Description: Master username for PostgreSQL
+
+Resources:
+  # ── DB Subnet Group (Cost: $0.00 / month - Subnet groups are free) ──
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnet group for Disaster Platform RDS across 2 private AZs
+      SubnetIds:
+        - Fn::ImportValue: !Sub "${NetworkStackName}-PrivateSubnet1Id"
+        - Fn::ImportValue: !Sub "${NetworkStackName}-PrivateSubnet2Id"
+      Tags:
+        - Key: Name
+          Value: !Sub "disaster-db-subnet-group-${EnvironmentName}"
+        - Key: Project
+          Value: DisasterResponse
+
+  # ── RDS PostgreSQL Instance ───────────────────────────────────
+  # Cost: Free Tier eligible (750 hours/month of db.t3.micro + 20 GB storage + 20 GB backups
+  #       free for 12 months. Non-Free Tier: ~$13 - $15 / month).
+  DBInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceIdentifier: !Sub "disaster-db-${EnvironmentName}"
+      Engine: postgres
+      EngineVersion: "16.9"
+      DBInstanceClass: !Ref DbInstanceClass
+      AllocatedStorage: !Ref DbAllocatedStorage
+      StorageType: gp2
+      DBName: !Ref DbName
+      MasterUsername: !Ref DbMasterUsername
+      # 1. Manage master password automatically in AWS Secrets Manager (zero secrets in code)
+      ManageMasterUserPassword: true
+      # 2. Network security: Private subnet only, not reachable from public internet
+      PubliclyAccessible: false
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      VPCSecurityGroups:
+        - Fn::ImportValue: !Sub "${NetworkStackName}-DbSecurityGroupId"
+      # 3. Security: Encrypted at rest
+      StorageEncrypted: true
+      # 4. Free Tier compliant: Single-AZ (MultiAZ = false) and 1 day backup retention
+      MultiAZ: false
+      BackupRetentionPeriod: 1
+      DeletionProtection: false
+      Tags:
+        - Key: Name
+          Value: !Sub "disaster-postgres-${EnvironmentName}"
+        - Key: Project
+          Value: DisasterResponse
+
+Outputs:
+  DbEndpointAddress:
+    Description: Endpoint hostname of the RDS PostgreSQL database
+    Value: !GetAtt DBInstance.Endpoint.Address
+    Export:
+      Name: !Sub "${AWS::StackName}-DbEndpointAddress"
+
+  DbEndpointPort:
+    Description: Port number of the RDS PostgreSQL database
+    Value: !GetAtt DBInstance.Endpoint.Port
+    Export:
+      Name: !Sub "${AWS::StackName}-DbEndpointPort"
+
+  DbSecretArn:
+    Description: ARN of the AWS Secrets Manager secret managing the master database credentials
+    Value: !GetAtt DBInstance.MasterUserSecret.SecretArn
+    Export:
+      Name: !Sub "${AWS::StackName}-DbSecretArn"
+
+  DbName:
+    Description: Name of the application database
+    Value: !Ref DbName
+    Export:
+      Name: !Sub "${AWS::StackName}-DbName"
+
+  DbInstanceIdentifier:
+    Description: Identifier of the RDS DB Instance
+    Value: !Ref DBInstance
+    Export:
+      Name: !Sub "${AWS::StackName}-DbInstanceIdentifier"
+

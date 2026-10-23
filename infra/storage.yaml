@@ -1,0 +1,77 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Storage infrastructure for Disaster Management Platform:
+  S3 bucket for emergency photos with Block Public Access ON,
+  SSE-S3 AES-256 encryption, CORS, and 90-day lifecycle expiration.
+  Free Tier compliant (5 GB S3 storage free for 12 months).
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: production
+    Description: Environment name prefix for resources
+
+  AllowedOrigin:
+    Type: String
+    Default: "*"
+    Description: Allowed origin for browser CORS uploads/downloads (e.g. http://localhost:5173 or domain)
+
+Resources:
+  # ── S3 Bucket for Incident Photos ─────────────────────────────
+  # Cost: Free Tier eligible (5 GB storage, 20,000 GET, 2,000 PUT requests / month free for 12 months;
+  #       then ~$0.023 / GB / month for storage).
+  PhotoBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      # Bucket name left auto-generated to guarantee global uniqueness
+      BucketName: !Sub "disaster-response-photos-${AWS::AccountId}-${AWS::Region}"
+      # 1. Block Public Access ON (all 4 flags active)
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      # 2. Server-side encryption AES-256 (SSE-S3 at no extra charge)
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      # 3. Versioning OFF (Suspended to prevent storage cost build-up)
+      VersioningConfiguration:
+        Status: Suspended
+      # 4. CORS configuration for browser direct S3 presigned PUT/GET
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders:
+              - "*"
+            AllowedMethods:
+              - PUT
+              - GET
+              - HEAD
+            AllowedOrigins:
+              - !Ref AllowedOrigin
+            MaxAge: 3600
+      # 5. Lifecycle rule: automatically expire photos after 90 days to control cost
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireIncidentPhotosAfter90Days
+            Status: Enabled
+            ExpirationInDays: 90
+      Tags:
+        - Key: Name
+          Value: !Sub "disaster-photos-${EnvironmentName}"
+        - Key: Project
+          Value: DisasterResponse
+
+Outputs:
+  PhotoBucketName:
+    Description: S3 photo bucket name
+    Value: !Ref PhotoBucket
+    Export:
+      Name: !Sub "${AWS::StackName}-PhotoBucketName"
+
+  PhotoBucketArn:
+    Description: S3 photo bucket ARN
+    Value: !GetAtt PhotoBucket.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-PhotoBucketArn"
