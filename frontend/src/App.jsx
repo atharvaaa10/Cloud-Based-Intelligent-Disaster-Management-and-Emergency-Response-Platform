@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
+import { ToastProvider } from './context/ToastContext';
 import AppLayout from './components/AppLayout';
 import LoginPage from './pages/LoginPage';
 import MyRequests from './pages/MyRequests';
@@ -13,7 +15,7 @@ import './index.css';
 
 function ProtectedRoute({ children, roles }) {
   const { user, loading } = useAuth();
-  if (loading) return <div className="loading-page"><span className="spinner" /> Loading...</div>;
+  if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', gap: 8, color: 'var(--text-secondary)' }}><span className="ui-spinner" style={{ width: 20, height: 20 }} /> Loading...</div>;
   if (!user) return <Navigate to="/login" replace />;
   if (roles && !roles.includes(user.role)) return <Navigate to="/" replace />;
   return children;
@@ -21,7 +23,7 @@ function ProtectedRoute({ children, roles }) {
 
 function RootRedirect() {
   const { user, loading } = useAuth();
-  if (loading) return <div className="loading-page"><span className="spinner" /> Loading...</div>;
+  if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', gap: 8, color: 'var(--text-secondary)' }}><span className="ui-spinner" style={{ width: 20, height: 20 }} /> Loading...</div>;
   if (!user) return <Navigate to="/login" replace />;
   if (user.role === 'citizen') return <Navigate to="/citizen" replace />;
   return <Navigate to="/admin" replace />;
@@ -29,8 +31,10 @@ function RootRedirect() {
 
 function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
+    <ThemeProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/" element={<RootRedirect />} />
@@ -54,6 +58,8 @@ function App() {
         </Routes>
       </BrowserRouter>
     </AuthProvider>
+      </ToastProvider>
+    </ThemeProvider>
   );
 }
 

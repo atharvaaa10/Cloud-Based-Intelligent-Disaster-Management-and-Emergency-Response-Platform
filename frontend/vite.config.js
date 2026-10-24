@@ -10,6 +10,14 @@ export default defineConfig({
       '/incidents': 'http://localhost:8000',
       '/teams': 'http://localhost:8000',
       '/resources': 'http://localhost:8000',
+      '/admin/audit-log': {
+        target: 'http://localhost:8000',
+        bypass: (req) => {
+          if (req.headers.accept && req.headers.accept.includes('text/html')) {
+            return '/index.html';
+          }
+        },
+      },
       '/health': 'http://localhost:8000',
     },
   },

@@ -1,0 +1,269 @@
+@import '@fontsource-variable/inter';
+
+/* ═══════════════════════════════════════════════════════════════════
+   Design Tokens — Disaster Management & Emergency Response Platform
+   Linear / Vercel Internal Operations Tool Aesthetic
+   ═══════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Typography ──────────────────────────────────────────────── */
+  --font-sans: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Font Scale: 12 / 14 / 16 / 20 / 28px */
+  --text-xs: 12px;
+  --text-sm: 14px;
+  --text-base: 16px;
+  --text-lg: 20px;
+  --text-xl: 28px;
+
+  --font-normal: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+
+  --leading-tight: 1.25;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.625;
+
+  /* ── Spacing (4px base grid) ─────────────────────────────────── */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+
+  /* ── Shape & Transitions ─────────────────────────────────────── */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-full: 9999px;
+
+  --transition-fast: 120ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-normal: 150ms cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* ── Light Theme (Default) ───────────────────────────────────── */
+  --bg-canvas: #fafaf9;
+  --bg-surface: #ffffff;
+  --bg-surface-subdued: #f5f5f4;
+  --bg-surface-hover: #f5f5f4;
+  --bg-surface-active: #e7e5e4;
+
+  --border-subtle: #f5f5f4;
+  --border-default: #e7e5e4;
+  --border-hover: #d6d3d1;
+  --border-focus: #0284c7;
+
+  --text-primary: #1c1917;
+  --text-secondary: #78716c;
+  --text-tertiary: #a8a29e;
+  --text-inverse: #ffffff;
+
+  /* Accent: Deep Calm Operations Blue */
+  --accent: #0284c7;
+  --accent-hover: #0369a1;
+  --accent-active: #075985;
+  --accent-subdued: #e0f2fe;
+  --accent-focus-ring: rgba(2, 132, 199, 0.25);
+
+  /* Semantic - Priority Pills */
+  --pill-prio-low-bg: #f5f5f4;
+  --pill-prio-low-text: #57534e;
+  --pill-prio-low-border: #e7e5e4;
+
+  --pill-prio-medium-bg: #fef3c7;
+  --pill-prio-medium-text: #92400e;
+  --pill-prio-medium-border: #fde68a;
+
+  --pill-prio-high-bg: #ffedd5;
+  --pill-prio-high-text: #9a3412;
+  --pill-prio-high-border: #fed7aa;
+
+  --pill-prio-critical-bg: #fee2e2;
+  --pill-prio-critical-text: #991b1b;
+  --pill-prio-critical-border: #fecaca;
+
+  /* Semantic - Status Pills */
+  --pill-status-reported-bg: #f1f5f9;
+  --pill-status-reported-text: #334155;
+  --pill-status-reported-border: #cbd5e1;
+
+  --pill-status-assigned-bg: #e0f2fe;
+  --pill-status-assigned-text: #075985;
+  --pill-status-assigned-border: #bae6fd;
+
+  --pill-status-in_progress-bg: #fef3c7;
+  --pill-status-in_progress-text: #92400e;
+  --pill-status-in_progress-border: #fde68a;
+
+  --pill-status-resolved-bg: #ecfdf5;
+  --pill-status-resolved-text: #065f46;
+  --pill-status-resolved-border: #a7f3d0;
+
+  /* Semantic - Danger Actions */
+  --danger-bg: #fee2e2;
+  --danger-text: #991b1b;
+  --danger-border: #fecaca;
+  --danger-solid: #dc2626;
+  --danger-solid-hover: #b91c1c;
+
+  /* Subtle shadow for elevated modals only */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.12);
+
+  /* Layout dimensions */
+  --sidebar-width: 240px;
+  --topbar-height: 52px;
+  --content-max-width: 1200px;
+  --form-max-width: 560px;
+}
+
+/* ── Dark Theme (data-theme="dark") ───────────────────────────── */
+[data-theme="dark"] {
+  --bg-canvas: #0c0a09;
+  --bg-surface: #1c1917;
+  --bg-surface-subdued: #292524;
+  --bg-surface-hover: #292524;
+  --bg-surface-active: #44403c;
+
+  --border-subtle: #292524;
+  --border-default: #44403c;
+  --border-hover: #57534e;
+  --border-focus: #38bdf8;
+
+  --text-primary: #fafaf9;
+  --text-secondary: #a8a29e;
+  --text-tertiary: #78716c;
+  --text-inverse: #0c0a09;
+
+  --accent: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --accent-active: #0284c7;
+  --accent-subdued: rgba(56, 189, 248, 0.12);
+  --accent-focus-ring: rgba(56, 189, 248, 0.3);
+
+  /* Semantic - Priority Pills */
+  --pill-prio-low-bg: #292524;
+  --pill-prio-low-text: #d6d3d1;
+  --pill-prio-low-border: #44403c;
+
+  --pill-prio-medium-bg: rgba(245, 158, 11, 0.15);
+  --pill-prio-medium-text: #fcd34d;
+  --pill-prio-medium-border: rgba(245, 158, 11, 0.35);
+
+  --pill-prio-high-bg: rgba(249, 115, 22, 0.15);
+  --pill-prio-high-text: #fdba74;
+  --pill-prio-high-border: rgba(249, 115, 22, 0.35);
+
+  --pill-prio-critical-bg: rgba(239, 68, 68, 0.18);
+  --pill-prio-critical-text: #fca5a5;
+  --pill-prio-critical-border: rgba(239, 68, 68, 0.4);
+
+  /* Semantic - Status Pills */
+  --pill-status-reported-bg: rgba(100, 116, 139, 0.18);
+  --pill-status-reported-text: #cbd5e1;
+  --pill-status-reported-border: rgba(100, 116, 139, 0.35);
+
+  --pill-status-assigned-bg: rgba(14, 165, 233, 0.16);
+  --pill-status-assigned-text: #7dd3fc;
+  --pill-status-assigned-border: rgba(14, 165, 233, 0.35);
+
+  --pill-status-in_progress-bg: rgba(245, 158, 11, 0.15);
+  --pill-status-in_progress-text: #fcd34d;
+  --pill-status-in_progress-border: rgba(245, 158, 11, 0.35);
+
+  --pill-status-resolved-bg: rgba(16, 185, 129, 0.16);
+  --pill-status-resolved-text: #6ee7b7;
+  --pill-status-resolved-border: rgba(16, 185, 129, 0.35);
+
+  --danger-bg: rgba(239, 68, 68, 0.15);
+  --danger-text: #fca5a5;
+  --danger-border: rgba(239, 68, 68, 0.35);
+  --danger-solid: #ef4444;
+  --danger-solid-hover: #dc2626;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6);
+}
+
+/* Fallback automatic dark theme if no explicit data-theme is set */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg-canvas: #0c0a09;
+    --bg-surface: #1c1917;
+    --bg-surface-subdued: #292524;
+    --bg-surface-hover: #292524;
+    --bg-surface-active: #44403c;
+
+    --border-subtle: #292524;
+    --border-default: #44403c;
+    --border-hover: #57534e;
+    --border-focus: #38bdf8;
+
+    --text-primary: #fafaf9;
+    --text-secondary: #a8a29e;
+    --text-tertiary: #78716c;
+    --text-inverse: #0c0a09;
+
+    --accent: #38bdf8;
+    --accent-hover: #7dd3fc;
+    --accent-active: #0284c7;
+    --accent-subdued: rgba(56, 189, 248, 0.12);
+    --accent-focus-ring: rgba(56, 189, 248, 0.3);
+
+    --pill-prio-low-bg: #292524;
+    --pill-prio-low-text: #d6d3d1;
+    --pill-prio-low-border: #44403c;
+
+    --pill-prio-medium-bg: rgba(245, 158, 11, 0.15);
+    --pill-prio-medium-text: #fcd34d;
+    --pill-prio-medium-border: rgba(245, 158, 11, 0.35);
+
+    --pill-prio-high-bg: rgba(249, 115, 22, 0.15);
+    --pill-prio-high-text: #fdba74;
+    --pill-prio-high-border: rgba(249, 115, 22, 0.35);
+
+    --pill-prio-critical-bg: rgba(239, 68, 68, 0.18);
+    --pill-prio-critical-text: #fca5a5;
+    --pill-prio-critical-border: rgba(239, 68, 68, 0.4);
+
+    --pill-status-reported-bg: rgba(100, 116, 139, 0.18);
+    --pill-status-reported-text: #cbd5e1;
+    --pill-status-reported-border: rgba(100, 116, 139, 0.35);
+
+    --pill-status-assigned-bg: rgba(14, 165, 233, 0.16);
+    --pill-status-assigned-text: #7dd3fc;
+    --pill-status-assigned-border: rgba(14, 165, 233, 0.35);
+
+    --pill-status-in_progress-bg: rgba(245, 158, 11, 0.15);
+    --pill-status-in_progress-text: #fcd34d;
+    --pill-status-in_progress-border: rgba(245, 158, 11, 0.35);
+
+    --pill-status-resolved-bg: rgba(16, 185, 129, 0.16);
+    --pill-status-resolved-text: #6ee7b7;
+    --pill-status-resolved-border: rgba(16, 185, 129, 0.35);
+
+    --danger-bg: rgba(239, 68, 68, 0.15);
+    --danger-text: #fca5a5;
+    --danger-border: rgba(239, 68, 68, 0.35);
+    --danger-solid: #ef4444;
+    --danger-solid-hover: #dc2626;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6);
+  }
+}
+
+/* ── Motion Accessibility ─────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
