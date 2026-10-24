@@ -1,12 +1,15 @@
 import { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { ShieldAlert, Eye, EyeOff, Lock, Mail, User } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { Button, Input } from '../components/ui';
 
 export default function LoginPage() {
   const { login, register } = useAuth();
   const navigate = useNavigate();
   const [isRegister, setIsRegister] = useState(false);
   const [form, setForm] = useState({ name: '', email: '', password: '' });
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -25,49 +28,121 @@ export default function LoginPage() {
       }
       navigate(user.role === 'citizen' ? '/citizen' : '/admin');
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Authentication failed. Please check your credentials.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="auth-page">
-      <div className="auth-card card glass">
-        <h2>{isRegister ? 'Create Account' : 'Welcome Back'}</h2>
-        <p className="subtitle">
-          {isRegister
-            ? 'Register to report emergencies and track responses.'
-            : 'Sign in to the Disaster Management Platform.'}
-        </p>
+    <div className="auth-wrapper">
+      <div className="auth-card">
+        <div className="auth-header">
+          <div className="auth-brand-icon">
+            <ShieldAlert size={20} strokeWidth={2} />
+          </div>
+          <h1 className="auth-title">
+            {isRegister ? 'Create an account' : 'Sign in to platform'}
+          </h1>
+          <p className="auth-subtitle">
+            {isRegister
+              ? 'Register to report emergencies and track rescue responses.'
+              : 'Emergency coordination and operations management.'}
+          </p>
+        </div>
 
-        {error && <div className="alert alert-error">{error}</div>}
+        {error && (
+          <div
+            className="ui-hint"
+            role="alert"
+            style={{
+              padding: '10px 12px',
+              backgroundColor: 'var(--danger-bg)',
+              color: 'var(--danger-text)',
+              border: '1px solid var(--danger-border)',
+              borderRadius: 'var(--radius-md)',
+              marginBottom: '16px',
+            }}
+          >
+            {error}
+          </div>
+        )}
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} noValidate>
           {isRegister && (
-            <div className="form-group">
-              <label htmlFor="reg-name">Full Name</label>
-              <input id="reg-name" className="form-control" placeholder="Your name" value={form.name} onChange={set('name')} required />
-            </div>
+            <Input
+              label="Full name"
+              id="name"
+              type="text"
+              placeholder="Your name"
+              value={form.name}
+              onChange={set('name')}
+              required
+              leftIcon={User}
+            />
           )}
-          <div className="form-group">
-            <label htmlFor="login-email">Email</label>
-            <input id="login-email" className="form-control" type="email" placeholder="you@example.com" value={form.email} onChange={set('email')} required />
-          </div>
-          <div className="form-group">
-            <label htmlFor="login-pass">Password</label>
-            <input id="login-pass" className="form-control" type="password" placeholder="••••••" value={form.password} onChange={set('password')} required minLength={6} />
-          </div>
-          <button className="btn btn-primary btn-lg" style={{ width: '100%' }} disabled={loading}>
-            {loading ? <span className="spinner" style={{ width: 18, height: 18, borderWidth: 2 }}></span> : isRegister ? 'Create Account' : 'Sign In'}
-          </button>
+
+          <Input
+            label="Email address"
+            id="email"
+            type="email"
+            placeholder="name@organization.org"
+            value={form.email}
+            onChange={set('email')}
+            required
+            leftIcon={Mail}
+          />
+
+          <Input
+            label="Password"
+            id="password"
+            type={showPassword ? 'text' : 'password'}
+            placeholder="••••••••"
+            value={form.password}
+            onChange={set('password')}
+            required
+            minLength={6}
+            leftIcon={Lock}
+            rightSlot={
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                title={showPassword ? 'Hide password' : 'Show password'}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  color: 'var(--text-tertiary)',
+                  padding: '4px',
+                }}
+              >
+                {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+              </button>
+            }
+          />
+
+          <Button
+            type="submit"
+            variant="primary"
+            size="lg"
+            loading={loading}
+            style={{ width: '100%', marginTop: '8px' }}
+          >
+            {isRegister ? 'Create account' : 'Sign in'}
+          </Button>
         </form>
 
         <div className="auth-toggle">
           {isRegister ? 'Already have an account? ' : "Don't have an account? "}
-          <a href="#" onClick={(e) => { e.preventDefault(); setIsRegister(!isRegister); setError(''); }}>
-            {isRegister ? 'Sign In' : 'Register'}
-          </a>
+          <button
+            type="button"
+            onClick={() => {
+              setIsRegister(!isRegister);
+              setError('');
+            }}
+            style={{ color: 'var(--accent)', fontWeight: 500 }}
+          >
+            {isRegister ? 'Sign in' : 'Create an account'}
+          </button>
         </div>
       </div>
     </div>
