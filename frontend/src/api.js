@@ -22,8 +22,31 @@ async function request(method, path, body = null) {
 
   const data = await res.json();
   if (!res.ok) {
-    const msg = data.detail || JSON.stringify(data);
-    throw new Error(msg);
+    // FastAPI 422 validation errors: detail is an array of {loc, msg, type} objects.
+    // Other errors: detail is a plain string, or the body is something else entirely.
+    const detail = data.detail;
+    let msg;
+    if (Array.isArray(detail)) {
+      // Each item: { loc: ["body", "field_name"], msg: "...", type: "..." }
+      msg = detail
+        .map((err) => {
+          const field = Array.isArray(err.loc) && err.loc.length > 1
+            ? err.loc[err.loc.length - 1]   // e.g. "description"
+            : null;
+          const label = field
+            ? String(field).replace(/_/g, ' ')  // snake_case → words
+            : null;
+          return label ? `${label}: ${err.msg}` : err.msg;
+        })
+        .join('\n');
+    } else if (typeof detail === 'string') {
+      msg = detail;
+    } else {
+      msg = JSON.stringify(data);
+    }
+    const error = new Error(msg);
+    error.validationErrors = Array.isArray(detail) ? detail : null;
+    throw error;
   }
   return data;
 }

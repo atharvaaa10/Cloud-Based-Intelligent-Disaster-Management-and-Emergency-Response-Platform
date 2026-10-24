@@ -111,6 +111,20 @@ export default function ReportIncident() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    // ── Client-side pre-validation (mirrors backend schema) ──────────
+    const clientErrors = [];
+    if (!form.description || form.description.trim().length < 10)
+      clientErrors.push('description: Must be at least 10 characters.');
+    if (!form.location_text || form.location_text.trim().length < 3)
+      clientErrors.push('location or address: Must be at least 3 characters.');
+    if (Number(form.people_affected) < 1)
+      clientErrors.push('people affected: Must be at least 1.');
+    if (clientErrors.length > 0) {
+      setError(clientErrors.join('\n'));
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -263,22 +277,36 @@ export default function ReportIncident() {
       </div>
 
       <Card padding="lg" className="emergency-form-card">
-        {error && (
-          <div
-            role="alert"
-            style={{
-              padding: '10px 14px',
-              backgroundColor: 'var(--danger-bg)',
-              color: 'var(--danger-text)',
-              border: '1px solid var(--danger-border)',
-              borderRadius: 'var(--radius-md)',
-              marginBottom: 20,
-              fontSize: '13px',
-            }}
-          >
-            {error}
-          </div>
-        )}
+        {error && (() => {
+          // error may be a single message or newline-delimited list of validation errors
+          const lines = error.split('\n').map(s => s.trim()).filter(Boolean);
+          return (
+            <div
+              role="alert"
+              style={{
+                padding: '10px 14px',
+                backgroundColor: 'var(--danger-bg)',
+                color: 'var(--danger-text)',
+                border: '1px solid var(--danger-border)',
+                borderRadius: 'var(--radius-md)',
+                marginBottom: 20,
+                fontSize: '13px',
+              }}
+            >
+              {lines.length === 1 ? (
+                lines[0]
+              ) : (
+                <ul style={{ margin: 0, paddingLeft: 18, listStyle: 'disc' }}>
+                  {lines.map((line, i) => (
+                    <li key={i} style={{ marginBottom: i < lines.length - 1 ? 4 : 0 }}>
+                      {line}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          );
+        })()}
 
         <form onSubmit={handleSubmit} noValidate>
           {/* Category segmented card group */}
