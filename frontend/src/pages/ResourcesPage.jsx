@@ -1,112 +1,310 @@
 import { useEffect, useState } from 'react';
+import { Plus, Package, Edit2, Trash2 } from 'lucide-react';
 import { api } from '../api';
+import { useToast } from '../context/ToastContext';
+import {
+  Table,
+  Button,
+  Card,
+  Modal,
+  ConfirmDialog,
+  Input,
+  Select,
+  EmptyState,
+  SkeletonTableRow,
+} from '../components/ui';
 
 export default function ResourcesPage() {
+  const toast = useToast();
   const [resources, setResources] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: '', type: 'shelter', quantity: 0, is_available: true });
-  const [error, setError] = useState('');
+
+  // Modal form state
+  const [modalOpen, setModalOpen] = useState(false);
+  const [form, setForm] = useState({
+    name: '',
+    type: 'shelter',
+    quantity: 0,
+    is_available: true,
+  });
   const [editId, setEditId] = useState(null);
+  const [saving, setSaving] = useState(false);
 
-  const load = () => api.get('/resources').then(setResources).finally(() => setLoading(false));
-  useEffect(() => { load(); }, []);
+  // Confirm delete dialog state
+  const [deleteId, setDeleteId] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
-  const set = (k) => (e) => setForm({ ...form, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value });
+  const loadResources = () => {
+    setLoading(true);
+    api
+      .get('/resources')
+      .then(setResources)
+      .catch((err) => toast.error(err.message || 'Failed to load resources'))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadResources();
+  }, []);
+
+  const openCreate = () => {
+    setForm({ name: '', type: 'shelter', quantity: 0, is_available: true });
+    setEditId(null);
+    setModalOpen(true);
+  };
+
+  const openEdit = (resource) => {
+    setForm({
+      name: resource.name,
+      type: resource.type,
+      quantity: resource.quantity,
+      is_available: resource.is_available,
+    });
+    setEditId(resource.id);
+    setModalOpen(true);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
+    setSaving(true);
     try {
       const payload = { ...form, quantity: Number(form.quantity) };
       if (editId) {
         await api.put(`/resources/${editId}`, payload);
+        toast.success(`Resource "${form.name}" updated successfully`);
       } else {
         await api.post('/resources', payload);
+        toast.success(`Resource "${form.name}" added successfully`);
       }
-      setShowForm(false);
-      setEditId(null);
-      setForm({ name: '', type: 'shelter', quantity: 0, is_available: true });
-      await load();
-    } catch (err) { setError(err.message); }
+      setModalOpen(false);
+      loadResources();
+    } catch (err) {
+      toast.error(err.message || 'Failed to save resource');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const startEdit = (r) => {
-    setForm({ name: r.name, type: r.type, quantity: r.quantity, is_available: r.is_available });
-    setEditId(r.id);
-    setShowForm(true);
+  const confirmDelete = async () => {
+    if (!deleteId) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/resources/${deleteId}`);
+      toast.success('Resource deleted successfully');
+      setDeleteId(null);
+      loadResources();
+    } catch (err) {
+      toast.error(err.message || 'Failed to delete resource');
+    } finally {
+      setDeleting(false);
+    }
   };
-
-  const handleDelete = async (id) => {
-    if (!confirm('Delete this resource?')) return;
-    try { await api.delete(`/resources/${id}`); await load(); } catch (err) { setError(err.message); }
-  };
-
-  if (loading) return <div className="loading-page"><span className="spinner" /> Loading...</div>;
 
   return (
-    <>
-      <div className="page-header flex justify-between items-center">
+    <div>
+      {/* Page Header */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 24,
+          flexWrap: 'wrap',
+          gap: 16,
+        }}
+      >
         <div>
-          <h1>📦 Resources</h1>
-          <p>Manage shelters, food, medical supplies, and vehicles.</p>
+          <h1 className="ui-page-title">Emergency supplies & fleet</h1>
+          <p className="ui-page-desc">
+            Track shelter capacity, medical stockpiles, rations, and rescue vehicle inventory.
+          </p>
         </div>
-        <button className="btn btn-primary" onClick={() => { setShowForm(!showForm); setEditId(null); setForm({ name: '', type: 'shelter', quantity: 0, is_available: true }); }}>
-          {showForm ? 'Cancel' : '+ Add Resource'}
-        </button>
+
+        <Button variant="primary" icon={Plus} onClick={openCreate}>
+          Add emergency resource
+        </Button>
       </div>
 
-      {error && <div className="alert alert-error">{error}</div>}
-
-      {showForm && (
-        <div className="card mb-2" style={{ maxWidth: 500 }}>
-          <form onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label>Resource Name</label>
-              <input className="form-control" value={form.name} onChange={set('name')} required />
-            </div>
-            <div className="form-group">
-              <label>Type</label>
-              <select className="form-control" value={form.type} onChange={set('type')}>
-                <option value="shelter">Shelter</option>
-                <option value="food">Food</option>
-                <option value="medical_supply">Medical Supply</option>
-                <option value="vehicle">Vehicle</option>
-              </select>
-            </div>
-            <div className="form-group">
-              <label>Quantity</label>
-              <input className="form-control" type="number" min="0" value={form.quantity} onChange={set('quantity')} required />
-            </div>
-            <button className="btn btn-primary btn-sm">{editId ? 'Update' : 'Create'}</button>
-          </form>
-        </div>
+      {/* Main Table */}
+      {loading ? (
+        <Card padding="none">
+          <Table compact>
+            <thead>
+              <tr>
+                <th style={{ width: 70 }}>ID</th>
+                <th>Resource name</th>
+                <th>Type</th>
+                <th>Units in stock</th>
+                <th>Availability</th>
+                <th style={{ width: 140 }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <SkeletonTableRow columns={6} />
+              <SkeletonTableRow columns={6} />
+              <SkeletonTableRow columns={6} />
+            </tbody>
+          </Table>
+        </Card>
+      ) : resources.length === 0 ? (
+        <EmptyState
+          icon={Package}
+          title="No resources logged"
+          description="Log emergency shelters, medical kits, food packages, or response vehicles."
+          actionLabel="Add resource"
+          onAction={openCreate}
+        />
+      ) : (
+        <Card padding="none">
+          <Table compact stickyHeader>
+            <thead>
+              <tr>
+                <th style={{ width: 70 }}>ID</th>
+                <th>Resource item</th>
+                <th>Category</th>
+                <th>Quantity</th>
+                <th>Readiness</th>
+                <th style={{ width: 140 }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {resources.map((r) => (
+                <tr key={r.id}>
+                  <td style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>
+                    #{r.id}
+                  </td>
+                  <td style={{ fontWeight: 500 }}>{r.name}</td>
+                  <td style={{ textTransform: 'capitalize' }}>
+                    {r.type.replace('_', ' ')}
+                  </td>
+                  <td style={{ fontVariantNumeric: 'tabular-nums' }}>
+                    {r.quantity.toLocaleString()}
+                  </td>
+                  <td>
+                    <span
+                      className={`ui-badge ui-badge-sm ${
+                        r.is_available ? 'ui-badge-status-resolved' : 'ui-badge-prio-high'
+                      }`}
+                    >
+                      {r.is_available ? 'Available' : 'Depleted'}
+                    </span>
+                  </td>
+                  <td>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openEdit(r)}
+                        title="Edit resource"
+                      >
+                        <Edit2 size={13} />
+                        <span>Edit</span>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setDeleteId(r.id)}
+                        title="Delete resource"
+                        style={{ color: 'var(--danger-text)' }}
+                      >
+                        <Trash2 size={13} />
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        </Card>
       )}
 
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <table className="data-table">
-          <thead>
-            <tr><th>ID</th><th>Name</th><th>Type</th><th>Quantity</th><th>Available</th><th>Actions</th></tr>
-          </thead>
-          <tbody>
-            {resources.map((r) => (
-              <tr key={r.id}>
-                <td>#{r.id}</td>
-                <td>{r.name}</td>
-                <td style={{ textTransform: 'capitalize' }}>{r.type.replace('_', ' ')}</td>
-                <td>{r.quantity}</td>
-                <td><span className={`badge ${r.is_available ? 'badge-resolved' : 'badge-high'}`}>{r.is_available ? 'Yes' : 'No'}</span></td>
-                <td>
-                  <div className="flex gap-1">
-                    <button className="btn btn-outline btn-sm" onClick={() => startEdit(r)}>Edit</button>
-                    <button className="btn btn-danger btn-sm" onClick={() => handleDelete(r.id)}>Delete</button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </>
+      {/* Add / Edit Modal */}
+      <Modal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={editId ? 'Edit emergency resource' : 'Add emergency resource'}
+        description="Update inventory quantities and availability status."
+      >
+        <form onSubmit={handleSubmit}>
+          <Input
+            label="Resource or asset name"
+            id="resource-name"
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            placeholder="e.g. Inflatable Rescue Raft or Emergency Ration Box"
+            required
+          />
+
+          <Select
+            label="Resource classification"
+            id="resource-type"
+            value={form.type}
+            onChange={(e) => setForm({ ...form, type: e.target.value })}
+            options={[
+              { value: 'shelter', label: 'Emergency shelter' },
+              { value: 'food', label: 'Food & potable water' },
+              { value: 'medical_supply', label: 'Medical supply' },
+              { value: 'vehicle', label: 'Emergency rescue vehicle' },
+            ]}
+          />
+
+          <Input
+            label="Quantity / available units"
+            id="resource-quantity"
+            type="number"
+            min="0"
+            value={form.quantity}
+            onChange={(e) => setForm({ ...form, quantity: e.target.value })}
+            required
+          />
+
+          <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="checkbox"
+              id="resource-avail"
+              checked={form.is_available}
+              onChange={(e) => setForm({ ...form, is_available: e.target.checked })}
+              style={{ width: 16, height: 16, accentColor: 'var(--accent)' }}
+            />
+            <label htmlFor="resource-avail" style={{ fontSize: '13px', cursor: 'pointer' }}>
+              In stock and available for field dispatch
+            </label>
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: 8,
+              marginTop: 24,
+            }}
+          >
+            <Button
+              variant="ghost"
+              size="md"
+              type="button"
+              onClick={() => setModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button variant="primary" size="md" type="submit" loading={saving}>
+              {editId ? 'Save changes' : 'Add resource'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        onConfirm={confirmDelete}
+        title="Delete emergency resource"
+        description="Are you sure you want to remove this item from the active supply catalog?"
+        confirmLabel="Delete resource"
+        danger
+        loading={deleting}
+      />
+    </div>
   );
 }

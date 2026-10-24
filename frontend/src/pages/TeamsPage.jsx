@@ -1,110 +1,304 @@
 import { useEffect, useState } from 'react';
+import { Plus, Users, Edit2, Trash2 } from 'lucide-react';
 import { api } from '../api';
+import { useToast } from '../context/ToastContext';
+import {
+  Table,
+  Button,
+  Card,
+  Modal,
+  ConfirmDialog,
+  Input,
+  Select,
+  EmptyState,
+  SkeletonTableRow,
+} from '../components/ui';
 
 export default function TeamsPage() {
+  const toast = useToast();
   const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: '', type: 'rescue', contact: '', is_available: true });
-  const [error, setError] = useState('');
+
+  // Modal form state
+  const [modalOpen, setModalOpen] = useState(false);
+  const [form, setForm] = useState({
+    name: '',
+    type: 'rescue',
+    contact: '',
+    is_available: true,
+  });
   const [editId, setEditId] = useState(null);
+  const [saving, setSaving] = useState(false);
 
-  const load = () => api.get('/teams').then(setTeams).finally(() => setLoading(false));
-  useEffect(() => { load(); }, []);
+  // Confirm delete dialog state
+  const [deleteId, setDeleteId] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
-  const set = (k) => (e) => setForm({ ...form, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value });
+  const loadTeams = () => {
+    setLoading(true);
+    api
+      .get('/teams')
+      .then(setTeams)
+      .catch((err) => toast.error(err.message || 'Failed to load teams'))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadTeams();
+  }, []);
+
+  const openCreate = () => {
+    setForm({ name: '', type: 'rescue', contact: '', is_available: true });
+    setEditId(null);
+    setModalOpen(true);
+  };
+
+  const openEdit = (team) => {
+    setForm({
+      name: team.name,
+      type: team.type,
+      contact: team.contact || '',
+      is_available: team.is_available,
+    });
+    setEditId(team.id);
+    setModalOpen(true);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
+    setSaving(true);
     try {
       if (editId) {
         await api.put(`/teams/${editId}`, form);
+        toast.success(`Team "${form.name}" updated successfully`);
       } else {
         await api.post('/teams', form);
+        toast.success(`Team "${form.name}" created successfully`);
       }
-      setShowForm(false);
-      setEditId(null);
-      setForm({ name: '', type: 'rescue', contact: '', is_available: true });
-      await load();
-    } catch (err) { setError(err.message); }
+      setModalOpen(false);
+      loadTeams();
+    } catch (err) {
+      toast.error(err.message || 'Failed to save team');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const startEdit = (t) => {
-    setForm({ name: t.name, type: t.type, contact: t.contact || '', is_available: t.is_available });
-    setEditId(t.id);
-    setShowForm(true);
+  const confirmDelete = async () => {
+    if (!deleteId) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/teams/${deleteId}`);
+      toast.success('Team deleted successfully');
+      setDeleteId(null);
+      loadTeams();
+    } catch (err) {
+      toast.error(err.message || 'Failed to delete team');
+    } finally {
+      setDeleting(false);
+    }
   };
-
-  const handleDelete = async (id) => {
-    if (!confirm('Delete this team?')) return;
-    try { await api.delete(`/teams/${id}`); await load(); } catch (err) { setError(err.message); }
-  };
-
-  if (loading) return <div className="loading-page"><span className="spinner" /> Loading...</div>;
 
   return (
-    <>
-      <div className="page-header flex justify-between items-center">
+    <div>
+      {/* Page Header */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 24,
+          flexWrap: 'wrap',
+          gap: 16,
+        }}
+      >
         <div>
-          <h1>👥 Teams</h1>
-          <p>Manage rescue, medical, and volunteer teams.</p>
+          <h1 className="ui-page-title">Response teams & fleet</h1>
+          <p className="ui-page-desc">
+            Manage field deployment teams, specialization types, and dispatch readiness.
+          </p>
         </div>
-        <button className="btn btn-primary" onClick={() => { setShowForm(!showForm); setEditId(null); setForm({ name: '', type: 'rescue', contact: '', is_available: true }); }}>
-          {showForm ? 'Cancel' : '+ Add Team'}
-        </button>
+
+        <Button variant="primary" icon={Plus} onClick={openCreate}>
+          Add response team
+        </Button>
       </div>
 
-      {error && <div className="alert alert-error">{error}</div>}
-
-      {showForm && (
-        <div className="card mb-2" style={{ maxWidth: 500 }}>
-          <form onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label>Team Name</label>
-              <input className="form-control" value={form.name} onChange={set('name')} required />
-            </div>
-            <div className="form-group">
-              <label>Type</label>
-              <select className="form-control" value={form.type} onChange={set('type')}>
-                <option value="rescue">Rescue</option>
-                <option value="medical">Medical</option>
-                <option value="volunteer">Volunteer</option>
-              </select>
-            </div>
-            <div className="form-group">
-              <label>Contact</label>
-              <input className="form-control" value={form.contact} onChange={set('contact')} />
-            </div>
-            <button className="btn btn-primary btn-sm">{editId ? 'Update' : 'Create'}</button>
-          </form>
-        </div>
+      {/* Main Table */}
+      {loading ? (
+        <Card padding="none">
+          <Table compact>
+            <thead>
+              <tr>
+                <th style={{ width: 70 }}>ID</th>
+                <th>Team name</th>
+                <th>Type</th>
+                <th>Contact</th>
+                <th>Status</th>
+                <th style={{ width: 120 }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <SkeletonTableRow columns={6} />
+              <SkeletonTableRow columns={6} />
+              <SkeletonTableRow columns={6} />
+            </tbody>
+          </Table>
+        </Card>
+      ) : teams.length === 0 ? (
+        <EmptyState
+          icon={Users}
+          title="No teams registered"
+          description="Register your first search-and-rescue, medical, or volunteer fleet unit."
+          actionLabel="Add team"
+          onAction={openCreate}
+        />
+      ) : (
+        <Card padding="none">
+          <Table compact stickyHeader>
+            <thead>
+              <tr>
+                <th style={{ width: 70 }}>ID</th>
+                <th>Team name</th>
+                <th>Specialization</th>
+                <th>Contact info</th>
+                <th>Readiness</th>
+                <th style={{ width: 140 }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {teams.map((t) => (
+                <tr key={t.id}>
+                  <td style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>
+                    #{t.id}
+                  </td>
+                  <td style={{ fontWeight: 500 }}>{t.name}</td>
+                  <td style={{ textTransform: 'capitalize' }}>{t.type}</td>
+                  <td style={{ color: 'var(--text-secondary)' }}>
+                    {t.contact || '—'}
+                  </td>
+                  <td>
+                    <span
+                      className={`ui-badge ui-badge-sm ${
+                        t.is_available ? 'ui-badge-status-resolved' : 'ui-badge-prio-high'
+                      }`}
+                    >
+                      {t.is_available ? 'Available' : 'Dispatched'}
+                    </span>
+                  </td>
+                  <td>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openEdit(t)}
+                        title="Edit team"
+                      >
+                        <Edit2 size={13} />
+                        <span>Edit</span>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setDeleteId(t.id)}
+                        title="Delete team"
+                        style={{ color: 'var(--danger-text)' }}
+                      >
+                        <Trash2 size={13} />
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        </Card>
       )}
 
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <table className="data-table">
-          <thead>
-            <tr><th>ID</th><th>Name</th><th>Type</th><th>Contact</th><th>Available</th><th>Actions</th></tr>
-          </thead>
-          <tbody>
-            {teams.map((t) => (
-              <tr key={t.id}>
-                <td>#{t.id}</td>
-                <td>{t.name}</td>
-                <td style={{ textTransform: 'capitalize' }}>{t.type}</td>
-                <td>{t.contact || '—'}</td>
-                <td><span className={`badge ${t.is_available ? 'badge-resolved' : 'badge-high'}`}>{t.is_available ? 'Yes' : 'No'}</span></td>
-                <td>
-                  <div className="flex gap-1">
-                    <button className="btn btn-outline btn-sm" onClick={() => startEdit(t)}>Edit</button>
-                    <button className="btn btn-danger btn-sm" onClick={() => handleDelete(t.id)}>Delete</button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </>
+      {/* Add / Edit Modal */}
+      <Modal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={editId ? 'Edit response team' : 'Register new response team'}
+        description="Configure unit specialization and dispatch availability."
+      >
+        <form onSubmit={handleSubmit}>
+          <Input
+            label="Team name"
+            id="team-name"
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            placeholder="e.g. Pune NDRF Unit 1"
+            required
+          />
+
+          <Select
+            label="Specialization type"
+            id="team-type"
+            value={form.type}
+            onChange={(e) => setForm({ ...form, type: e.target.value })}
+            options={[
+              { value: 'rescue', label: 'Search and rescue' },
+              { value: 'medical', label: 'Medical first response' },
+              { value: 'volunteer', label: 'Volunteer logistics' },
+            ]}
+          />
+
+          <Input
+            label="Direct contact number or radio channel"
+            id="team-contact"
+            value={form.contact}
+            onChange={(e) => setForm({ ...form, contact: e.target.value })}
+            placeholder="e.g. +91 98230 00000 or VHF Ch 16"
+          />
+
+          <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="checkbox"
+              id="team-avail"
+              checked={form.is_available}
+              onChange={(e) => setForm({ ...form, is_available: e.target.checked })}
+              style={{ width: 16, height: 16, accentColor: 'var(--accent)' }}
+            />
+            <label htmlFor="team-avail" style={{ fontSize: '13px', cursor: 'pointer' }}>
+              Available for immediate dispatch
+            </label>
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: 8,
+              marginTop: 24,
+            }}
+          >
+            <Button
+              variant="ghost"
+              size="md"
+              type="button"
+              onClick={() => setModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button variant="primary" size="md" type="submit" loading={saving}>
+              {editId ? 'Save changes' : 'Create team'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        onConfirm={confirmDelete}
+        title="Delete response team"
+        description="Are you sure you want to delete this team? Active incident assignments linked to this unit may be affected."
+        confirmLabel="Delete team"
+        danger
+        loading={deleting}
+      />
+    </div>
   );
 }

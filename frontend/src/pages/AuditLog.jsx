@@ -1,7 +1,30 @@
 import { useState, useEffect, useCallback } from 'react';
+import {
+  RotateCw,
+  Filter,
+  ChevronRight,
+  ChevronDown,
+  Terminal,
+  Shield,
+  User,
+  Cpu,
+} from 'lucide-react';
 import { api } from '../api';
+import { useToast } from '../context/ToastContext';
+import {
+  Table,
+  Button,
+  Card,
+  Badge,
+  Select,
+  EmptyState,
+  SkeletonTableRow,
+  formatRelativeTime,
+  formatFullTime,
+} from '../components/ui';
 
 export default function AuditLog() {
+  const toast = useToast();
   const [logs, setLogs] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -9,12 +32,10 @@ export default function AuditLog() {
   const [actionFilter, setActionFilter] = useState('');
   const [entityFilter, setEntityFilter] = useState('');
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [expandedRow, setExpandedRow] = useState(null);
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
-    setError('');
     try {
       const params = new URLSearchParams({
         page: page.toString(),
@@ -27,7 +48,7 @@ export default function AuditLog() {
       setLogs(res.items || []);
       setTotal(res.total || 0);
     } catch (err) {
-      setError(err.message || 'Failed to fetch audit records');
+      toast.error(err.message || 'Failed to fetch audit log records');
     } finally {
       setLoading(false);
     }
@@ -39,214 +60,350 @@ export default function AuditLog() {
 
   const totalPages = Math.ceil(total / limit) || 1;
 
-  const getActionBadgeClass = (action) => {
-    if (action.includes('failure') || action.includes('deleted')) return 'badge-critical';
-    if (action.includes('success') || action.includes('created')) return 'badge-resolved';
-    if (action.includes('auto_triaged')) return 'badge-in_progress';
-    return 'badge-assigned';
-  };
+  const getActionPill = (action) => {
+    const isCritical = action.includes('failure') || action.includes('deleted');
+    const isSuccess = action.includes('success') || action.includes('created');
+    const isAutoTriage = action.includes('auto_triaged');
 
-  const formatActionName = (action) => {
-    return action.replace('.', ' → ').toUpperCase();
+    let className = 'ui-badge ui-badge-sm ';
+    if (isCritical) className += 'ui-badge-prio-critical';
+    else if (isSuccess) className += 'ui-badge-status-resolved';
+    else if (isAutoTriage) className += 'ui-badge-autotriage';
+    else className += 'ui-badge-status-assigned';
+
+    return (
+      <span className={className}>
+        {action.replace('.', ' → ')}
+      </span>
+    );
   };
 
   return (
-    <div className="page-container">
-      <div className="page-header">
+    <div>
+      {/* Page Header */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 24,
+          flexWrap: 'wrap',
+          gap: 16,
+        }}
+      >
         <div>
-          <h2>📜 Application Audit Trail</h2>
-          <p>Security and administrative operational event logging ({total} total entries)</p>
+          <h1 className="ui-page-title">Security & operational audit trail</h1>
+          <p className="ui-page-desc">
+            Immutable regulatory logging of all authentication events, triage executions, and state changes ({total} total entries).
+          </p>
         </div>
-        <button className="btn btn-secondary btn-sm" onClick={fetchLogs} disabled={loading}>
-          {loading ? 'Refreshing...' : '🔄 Refresh Log'}
-        </button>
+
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={RotateCw}
+          onClick={fetchLogs}
+          loading={loading}
+        >
+          Refresh log
+        </Button>
       </div>
 
-      {error && <div className="alert alert-error mb-3">{error}</div>}
-
-      {/* Filter controls */}
-      <div className="card mb-3 p-3" style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
-        <div style={{ flex: 1, minWidth: '180px' }}>
-          <label style={{ fontSize: '.75rem', fontWeight: 700, color: 'var(--c-text-muted)' }}>ACTION TYPE</label>
-          <select
-            className="form-control"
+      {/* Filter Controls */}
+      <div
+        style={{
+          display: 'flex',
+          gap: 12,
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          marginBottom: 16,
+        }}
+      >
+        <div style={{ minWidth: 200, flex: 1 }}>
+          <Select
+            id="action-filter"
             value={actionFilter}
             onChange={(e) => {
               setActionFilter(e.target.value);
               setPage(1);
             }}
-          >
-            <option value="">All Actions</option>
-            <option value="auth.login">Auth Logins (Success/Fail)</option>
-            <option value="incident.">Incident Changes</option>
-            <option value="incident.auto_triaged">Auto-Triage Operations</option>
-            <option value="team.">Team Management</option>
-            <option value="resource.">Resource Management</option>
-          </select>
+            options={[
+              { value: '', label: 'All action types' },
+              { value: 'auth.login', label: 'Auth logins (success & failure)' },
+              { value: 'incident.', label: 'Incident status & priority' },
+              { value: 'incident.auto_triaged', label: 'Serverless auto-triage' },
+              { value: 'team.', label: 'Team fleet operations' },
+              { value: 'resource.', label: 'Resource allocations' },
+            ]}
+          />
         </div>
 
-        <div style={{ flex: 1, minWidth: '180px' }}>
-          <label style={{ fontSize: '.75rem', fontWeight: 700, color: 'var(--c-text-muted)' }}>ENTITY TYPE</label>
-          <select
-            className="form-control"
+        <div style={{ minWidth: 160 }}>
+          <Select
+            id="entity-filter"
             value={entityFilter}
             onChange={(e) => {
               setEntityFilter(e.target.value);
               setPage(1);
             }}
-          >
-            <option value="">All Entities</option>
-            <option value="incident">Incident</option>
-            <option value="user">User</option>
-            <option value="team">Team</option>
-            <option value="resource">Resource</option>
-          </select>
+            options={[
+              { value: '', label: 'All entity types' },
+              { value: 'incident', label: 'Incident' },
+              { value: 'user', label: 'User' },
+              { value: 'team', label: 'Team' },
+              { value: 'resource', label: 'Resource' },
+            ]}
+          />
         </div>
 
         {(actionFilter || entityFilter) && (
-          <div style={{ alignSelf: 'flex-end' }}>
-            <button
-              className="btn btn-outline btn-sm"
-              onClick={() => {
-                setActionFilter('');
-                setEntityFilter('');
-                setPage(1);
-              }}
-            >
-              Clear Filters
-            </button>
-          </div>
+          <Button
+            variant="ghost"
+            size="md"
+            onClick={() => {
+              setActionFilter('');
+              setEntityFilter('');
+              setPage(1);
+            }}
+          >
+            Clear filters
+          </Button>
         )}
       </div>
 
-      {/* Audit table */}
-      <div className="card">
-        {loading && logs.length === 0 ? (
-          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--c-text-muted)' }}>
-            <span className="spinner" /> Loading audit records...
-          </div>
-        ) : logs.length === 0 ? (
-          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--c-text-muted)' }}>
-            No audit records found matching the criteria.
-          </div>
-        ) : (
-          <div className="table-responsive">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Timestamp</th>
-                  <th>Action</th>
-                  <th>Actor</th>
-                  <th>Entity</th>
-                  <th>Client IP</th>
-                  <th>Details</th>
-                </tr>
-              </thead>
-              <tbody>
-                {logs.map((item) => (
-                  <tr key={item.id}>
-                    <td style={{ fontSize: '.8rem', whiteSpace: 'nowrap', color: 'var(--c-text-muted)' }}>
-                      {new Date(item.created_at).toLocaleString()}
-                    </td>
+      {/* Main Table */}
+      {loading && logs.length === 0 ? (
+        <Card padding="none">
+          <Table compact>
+            <thead>
+              <tr>
+                <th style={{ width: 150 }}>Timestamp</th>
+                <th>Action</th>
+                <th>Actor</th>
+                <th>Entity</th>
+                <th>Client IP</th>
+                <th style={{ width: 80 }}>Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              <SkeletonTableRow columns={6} />
+              <SkeletonTableRow columns={6} />
+              <SkeletonTableRow columns={6} />
+              <SkeletonTableRow columns={6} />
+            </tbody>
+          </Table>
+        </Card>
+      ) : logs.length === 0 ? (
+        <EmptyState
+          icon={Shield}
+          title="No audit records found"
+          description="No administrative or operational log events match the selected criteria."
+          actionLabel={actionFilter || entityFilter ? 'Clear filters' : undefined}
+          onAction={() => {
+            setActionFilter('');
+            setEntityFilter('');
+          }}
+        />
+      ) : (
+        <Card padding="none">
+          <Table compact stickyHeader>
+            <thead>
+              <tr>
+                <th style={{ width: 140 }}>Timestamp</th>
+                <th>Action</th>
+                <th>Actor</th>
+                <th>Target entity</th>
+                <th>IP address</th>
+                <th style={{ width: 90 }}>Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              {logs.map((item) => {
+                const isExpanded = expandedRow === item.id;
+                const hasDetails = item.details && Object.keys(item.details).length > 0;
+
+                return (
+                  <tr
+                    key={item.id}
+                    style={{
+                      backgroundColor: isExpanded ? 'var(--bg-surface-subdued)' : undefined,
+                    }}
+                  >
                     <td>
-                      <span className={`badge ${getActionBadgeClass(item.action)}`}>
-                        {formatActionName(item.action)}
-                      </span>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span
+                          title={formatFullTime(item.created_at)}
+                          style={{
+                            fontFamily: 'var(--font-mono)',
+                            fontSize: '11px',
+                            color: 'var(--text-primary)',
+                          }}
+                        >
+                          {formatRelativeTime(item.created_at)}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: '10px',
+                            color: 'var(--text-tertiary)',
+                            fontFamily: 'var(--font-mono)',
+                          }}
+                        >
+                          {new Date(item.created_at).toLocaleTimeString('en-IN', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                          })}
+                        </span>
+                      </div>
                     </td>
+
+                    <td>{getActionPill(item.action)}</td>
+
                     <td>
                       {item.actor ? (
-                        <div>
-                          <strong>{item.actor.name}</strong>
-                          <div style={{ fontSize: '.75rem', color: 'var(--c-text-muted)' }}>
-                            {item.actor.email} ({item.actor_role})
-                          </div>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <span style={{ fontSize: '12px', fontWeight: 500 }}>
+                            {item.actor.name}
+                          </span>
+                          <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                            {item.actor_role}
+                          </span>
                         </div>
                       ) : (
-                        <span style={{ color: 'var(--c-primary)', fontWeight: 600 }}>
-                          🤖 {item.actor_role || 'System'}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--accent)', fontSize: '12px', fontWeight: 500 }}>
+                          <Cpu size={13} />
+                          <span>{item.actor_role || 'System'}</span>
+                        </div>
                       )}
                     </td>
+
                     <td>
                       {item.entity_type ? (
-                        <span style={{ fontSize: '.85rem' }}>
-                          <code>{item.entity_type}</code> #{item.entity_id}
+                        <span
+                          style={{
+                            fontFamily: 'var(--font-mono)',
+                            fontSize: '11px',
+                            color: 'var(--text-secondary)',
+                          }}
+                        >
+                          {item.entity_type} #{item.entity_id}
                         </span>
                       ) : (
-                        <span style={{ color: 'var(--c-text-muted)' }}>—</span>
+                        <span style={{ color: 'var(--text-tertiary)' }}>—</span>
                       )}
                     </td>
-                    <td style={{ fontSize: '.8rem', fontFamily: 'monospace' }}>
+
+                    <td
+                      style={{
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: '11px',
+                        color: 'var(--text-secondary)',
+                      }}
+                    >
                       {item.ip_address || '—'}
                     </td>
+
                     <td>
-                      {item.details && Object.keys(item.details).length > 0 ? (
-                        <div>
-                          <button
-                            className="btn btn-outline btn-sm"
-                            style={{ padding: '2px 8px', fontSize: '.75rem' }}
-                            onClick={() => setExpandedRow(expandedRow === item.id ? null : item.id)}
-                          >
-                            {expandedRow === item.id ? 'Hide' : 'Inspect'}
-                          </button>
-                          {expandedRow === item.id && (
-                            <pre
-                              style={{
-                                marginTop: '.5rem',
-                                padding: '.5rem',
-                                background: 'rgba(0,0,0,0.25)',
-                                borderRadius: '4px',
-                                fontSize: '.75rem',
-                                maxWidth: '340px',
-                                overflowX: 'auto',
-                              }}
-                            >
-                              {JSON.stringify(item.details, null, 2)}
-                            </pre>
-                          )}
-                        </div>
+                      {hasDetails ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setExpandedRow(isExpanded ? null : item.id)}
+                          style={{ padding: '2px 6px', fontSize: '11px' }}
+                        >
+                          {isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                          <span>{isExpanded ? 'Hide' : 'Inspect'}</span>
+                        </Button>
                       ) : (
-                        <span style={{ color: 'var(--c-text-muted)', fontSize: '.8rem' }}>None</span>
+                        <span style={{ color: 'var(--text-tertiary)', fontSize: '11px' }}>
+                          None
+                        </span>
                       )}
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                );
+              })}
+            </tbody>
+          </Table>
 
-        {/* Pagination controls */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            padding: '1rem',
-            borderTop: '1px solid var(--c-border)',
-          }}
-        >
-          <div style={{ fontSize: '.85rem', color: 'var(--c-text-muted)' }}>
-            Page {page} of {totalPages} ({total} entries)
-          </div>
-          <div style={{ display: 'flex', gap: '.5rem' }}>
-            <button
-              className="btn btn-secondary btn-sm"
-              disabled={page <= 1 || loading}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
+          {/* Details inspection drawer when row is expanded */}
+          {expandedRow && (
+            <div
+              style={{
+                padding: '12px 16px',
+                borderTop: '1px solid var(--border-default)',
+                backgroundColor: 'var(--bg-surface-subdued)',
+              }}
             >
-              Previous
-            </button>
-            <button
-              className="btn btn-secondary btn-sm"
-              disabled={page >= totalPages || loading}
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            >
-              Next
-            </button>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+                  Payload metadata (Log #{expandedRow})
+                </span>
+                <Button variant="ghost" size="sm" onClick={() => setExpandedRow(null)}>
+                  Close inspection
+                </Button>
+              </div>
+              <pre
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '11px',
+                  lineHeight: 1.5,
+                  padding: '10px 12px',
+                  backgroundColor: 'var(--bg-surface)',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border-default)',
+                  color: 'var(--text-primary)',
+                  overflowX: 'auto',
+                  margin: 0,
+                }}
+              >
+                {JSON.stringify(
+                  logs.find((l) => l.id === expandedRow)?.details || {},
+                  null,
+                  2
+                )}
+              </pre>
+            </div>
+          )}
+
+          {/* Pagination Footer */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '12px 16px',
+              borderTop: '1px solid var(--border-default)',
+              backgroundColor: 'var(--bg-surface-subdued)',
+              fontSize: '12px',
+              color: 'var(--text-secondary)',
+            }}
+          >
+            <span>
+              Page {page} of {totalPages} ({total.toLocaleString()} total entries)
+            </span>
+
+            <div style={{ display: 'flex', gap: 6 }}>
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={page <= 1 || loading}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={page >= totalPages || loading}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              >
+                Next
+              </Button>
+            </div>
           </div>
-        </div>
-      </div>
+        </Card>
+      )}
     </div>
   );
 }
