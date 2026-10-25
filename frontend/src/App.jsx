@@ -4,6 +4,8 @@ import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './context/ToastContext';
 import AppLayout from './components/AppLayout';
 import LoginPage from './pages/LoginPage';
+import CitizenOverview from './pages/CitizenOverview';
+import LiveMap from './pages/LiveMap';
 import MyRequests from './pages/MyRequests';
 import ReportIncident from './pages/ReportIncident';
 import AdminDashboard from './pages/AdminDashboard';
@@ -11,6 +13,8 @@ import IncidentDetail from './pages/IncidentDetail';
 import TeamsPage from './pages/TeamsPage';
 import ResourcesPage from './pages/ResourcesPage';
 import AuditLog from './pages/AuditLog';
+import CitizenResources from './pages/CitizenResources';
+import CitizenUpdates from './pages/CitizenUpdates';
 import './index.css';
 
 function ProtectedRoute({ children, roles }) {
@@ -40,9 +44,15 @@ function App() {
           <Route path="/" element={<RootRedirect />} />
 
           {/* Citizen routes */}
-          <Route element={<ProtectedRoute roles={['citizen']}><AppLayout /></ProtectedRoute>}>
-            <Route path="/citizen" element={<MyRequests />} />
+          <Route element={<ProtectedRoute roles={['citizen', 'admin', 'responder']}><AppLayout /></ProtectedRoute>}>
+            <Route path="/citizen" element={<CitizenOverview />} />
+            <Route path="/citizen/map" element={<LiveMap />} />
+            <Route path="/map" element={<Navigate to="/citizen/map" replace />} />
+            <Route path="/citizen/requests" element={<MyRequests />} />
+            <Route path="/citizen/my-requests" element={<Navigate to="/citizen/requests" replace />} />
             <Route path="/citizen/report" element={<ReportIncident />} />
+            <Route path="/citizen/resources" element={<CitizenResources />} />
+            <Route path="/citizen/updates" element={<CitizenUpdates />} />
           </Route>
 
           {/* Admin / Responder routes */}

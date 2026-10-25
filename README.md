@@ -149,6 +149,59 @@ Open **[http://localhost:5173](http://localhost:5173)** in your browser.
 
 ---
 
+## 📱 Citizen Portal Features & Walkthrough
+
+The platform includes a dedicated, privacy-preserving Citizen Portal designed for desktop and mobile devices:
+
+1. **Home / Overview (`/citizen/overview`)**:
+   - Quick "Report Emergency" action and one-tap emergency call badges (`112`, `108`, `1077`).
+   - Summary statistics of citizen's own requests (Total, Active, Resolved).
+   - Recent request tracker with color-coded status badges and relative time.
+   - Nearest emergency shelters with distance calculation via browser geolocation.
+2. **Report Incident (`/citizen/report`)**:
+   - Direct emergency reporting with geolocation, category selection, and S3-presigned photo upload.
+   - Non-blocking serverless queue handoff.
+3. **My Requests (`/citizen/requests`)**:
+   - Paginated list of reported incidents with search, status, and category filtering.
+   - Interactive Detail Drawer with full timeline, assigned rescue team, and read-only priority.
+   - Citizen request cancellation and note addition strictly enforced while status is `reported`.
+   - Auto-polling every 30 seconds with optimistic local updates.
+4. **Live Map (`/citizen/map`)**:
+   - Leaflet/OpenStreetMap dark theme with Map & Satellite toggle.
+   - Privacy-preserving public view: citizen sees own incidents in full detail, while other incidents appear as generalized ~500m public category markers.
+   - Public shelters, hospitals, relief points, and affected disaster zones.
+5. **Resources (`/citizen/resources`)**:
+   - Categorized search and filters for Shelters, Hospitals, and Relief Supply points.
+   - Real-time distance sorting, capacity status, click-to-call phone numbers, and directions.
+   - India emergency helpline directory (`112`, `108`, `101`, `100`, `1078`, `1091`, `1098`, `14567`).
+6. **Updates & Notifications (`/citizen/updates`)**:
+   - Automatic incident status notifications and broadcast emergency alerts.
+   - Unread badges, mark-as-read, and 30-second live auto-refresh.
+
+### 🎬 Citizen Portal Demo Script
+```text
+1. Register or Log in:
+   - Go to http://localhost:5173/login
+   - Log in as citizen@disaster.io / cit123 (or click "Register" to create a new citizen account).
+2. Overview:
+   - View your personal emergency summary and nearby shelters.
+   - Click "Report Emergency" or navigate to "Report".
+3. Report an Incident:
+   - Fill in category (e.g. Medical or Rescue), description, and upload a scene photo.
+   - Submit report; observe instant redirect to your requests with SQS background triage.
+4. Track Incident:
+   - In "My Requests", view your incident status (initially "Reported" and priority "Pending review").
+   - Click on the incident row to open the status timeline drawer. Add a supplemental note.
+5. Explore Map & Resources:
+   - Visit "Live Map" to view your exact incident marker alongside generalized public disaster markers.
+   - Visit "Resources" to inspect nearby shelters and tap emergency helplines.
+6. Verify Updates:
+   - Switch to "Updates" to see real-time alert notifications when your request status transitions.
+```
+
+
+---
+
 ## ☁️ One-Command AWS Deployment (Phase 4)
 
 All infrastructure is provisioned through modular CloudFormation templates within **AWS Free Tier** limits ($0.00 / month).

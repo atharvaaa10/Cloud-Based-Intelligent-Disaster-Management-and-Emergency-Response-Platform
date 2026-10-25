@@ -3,7 +3,7 @@ Pydantic schemas for request / response validation.
 """
 
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 import re
 from pydantic import BaseModel, EmailStr, Field, ConfigDict, model_validator, field_validator
 
@@ -167,8 +167,24 @@ class PriorityUpdate(BaseModel):
 
 
 class StatusUpdate(BaseModel):
-    status: str = Field(..., pattern=r"^(reported|under_review|assigned|in_progress|resolved)$")
+    status: str = Field(..., pattern=r"^(reported|under_review|assigned|in_progress|resolved|cancelled)$")
     note: Optional[str] = Field(default=None, max_length=500)
+
+
+class IncidentCancelRequest(BaseModel):
+    reason: Optional[str] = Field(default=None, max_length=500)
+
+
+class IncidentNoteRequest(BaseModel):
+    note: str = Field(..., min_length=1, max_length=1000)
+
+
+class PaginatedIncidentsOut(BaseModel):
+    items: List[IncidentOut]
+    total: int
+    page: int
+    limit: int
+    pages: int
 
 
 class AssignTeamRequest(BaseModel):
@@ -276,12 +292,15 @@ class AssignmentOut(BaseModel):
     team_id: int
     assigned_by: int
     assigned_at: datetime
+    team_name: Optional[str] = None
 
 
 class IncidentDetail(IncidentOut):
     reporter: Optional[UserOut] = None
     assignments: List[AssignmentOut] = []
     status_history: List[StatusHistoryOut] = []
+    assigned_team_name: Optional[str] = None
+    photo_url: Optional[str] = None
 
 
 # ── Compatibility: Team & Resource ───────────────────────────
@@ -341,3 +360,78 @@ class AuditLogListResponse(BaseModel):
     total: int
     page: int
     limit: int
+
+
+# ── Citizen Overview ──────────────────────────────────────────
+
+class CitizenStats(BaseModel):
+    total: int
+    active: int
+    resolved: int
+
+
+class NearbyShelterOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    name: str
+    address: str
+    latitude: float
+    longitude: float
+    capacity: int
+    available: bool
+    contact: Optional[str] = None
+    distance_km: float
+
+
+class AnnouncementOut(BaseModel):
+    id: str
+    title: str
+    message: str
+    severity: str  # critical | warning | info
+    source: str
+    issued_at: datetime
+    active: bool = True
+
+
+class CitizenOverviewOut(BaseModel):
+    stats: CitizenStats
+    recent_requests: List[IncidentOut]
+    announcements: List[AnnouncementOut]
+    nearby_shelters: List[NearbyShelterOut]
+    user_location: Dict[str, Any]
+
+
+# ── Live Map Schemas ──────────────────────────────────────────
+
+class PublicIncidentMarker(BaseModel):
+    id: int
+    public_code: str
+    category: str
+    approx_latitude: float
+    approx_longitude: float
+    general_area: str
+    priority: str
+    status: str
+    people_affected: Optional[int] = None
+    created_at: datetime
+
+
+class AffectedZoneOut(BaseModel):
+    id: str
+    name: str
+    category: str
+    severity: str  # critical | high | medium | low
+    center_latitude: float
+    center_longitude: float
+    radius_meters: int
+    description: str
+
+
+class PublicMapResponse(BaseModel):
+    incidents: List[PublicIncidentMarker]
+    places: List[PlaceOut]
+    affected_zones: List[AffectedZoneOut]
+    total_public_incidents: int
+    total_places: int
+
+

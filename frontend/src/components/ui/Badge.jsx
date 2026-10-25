@@ -1,6 +1,7 @@
-import { Zap, AlertTriangle, AlertCircle, Info, Clock, CheckCircle2, UserCheck, Flame } from 'lucide-react';
+import { Zap, AlertTriangle, AlertCircle, Info, Clock, CheckCircle2, UserCheck, Flame, XCircle } from 'lucide-react';
 
 const PRIORITY_LABELS = {
+  pending: 'Pending review',
   low: 'Low',
   medium: 'Medium',
   high: 'High',
@@ -9,9 +10,11 @@ const PRIORITY_LABELS = {
 
 const STATUS_LABELS = {
   reported: 'Reported',
+  under_review: 'Under review',
   assigned: 'Assigned',
   in_progress: 'In progress',
   resolved: 'Resolved',
+  cancelled: 'Cancelled',
 };
 
 export default function Badge({
@@ -35,6 +38,7 @@ export default function Badge({
       if (p === 'critical') Icon = Flame;
       else if (p === 'high') Icon = AlertCircle;
       else if (p === 'medium') Icon = AlertTriangle;
+      else if (p === 'pending') Icon = Clock;
       else Icon = Info;
     }
   } else if (variant === 'status') {
@@ -43,8 +47,9 @@ export default function Badge({
     text = STATUS_LABELS[s] || s.replace('_', ' ');
     if (!Icon) {
       if (s === 'resolved') Icon = CheckCircle2;
-      else if (s === 'in_progress') Icon = Clock;
+      else if (s === 'in_progress' || s === 'under_review') Icon = Clock;
       else if (s === 'assigned') Icon = UserCheck;
+      else if (s === 'cancelled') Icon = XCircle;
       else Icon = Info;
     }
   } else if (variant === 'auto-triage') {

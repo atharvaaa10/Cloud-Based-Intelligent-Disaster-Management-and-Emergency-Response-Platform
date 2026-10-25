@@ -6,6 +6,8 @@ import {
   Users,
   Package,
   FileText,
+  Home,
+  Map as MapIcon,
   AlertTriangle,
   ClipboardList,
   LogOut,
@@ -13,15 +15,19 @@ import {
   Moon,
   Menu,
   X,
+  LifeBuoy,
+  Bell,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useBellCount } from '../hooks/useBellCount';
 
 export default function AppLayout() {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
+  const { count: bellCount } = useBellCount();
 
   const isAdmin = user?.role === 'admin';
   const isResponder = user?.role === 'responder';
@@ -44,20 +50,35 @@ export default function AppLayout() {
     if (p === '/admin/resources') return 'Emergency resources';
     if (p === '/admin/audit-log') return 'Security audit trail';
     if (p === '/citizen/report') return 'Report emergency';
-    if (p === '/citizen') return 'My emergency requests';
+    if (p === '/citizen/map' || p === '/map') return 'Live disaster map';
+    if (p === '/citizen/requests' || p === '/citizen/my-requests') return 'My emergency requests';
+    if (p === '/citizen/resources') return 'Emergency resources';
+    if (p === '/citizen/updates') return 'Updates & notifications';
+    if (p === '/citizen') return 'Citizen overview';
     return 'Disaster management';
   };
 
   // Close mobile sidebar on link navigation
   const closeMobile = () => setMobileOpen(false);
 
-  // ── Citizen Layout (Streamlined Top Navigation) ────────────────
+  // ── Citizen Layout (Streamlined Top Navigation + Hamburger < 1100px) ────
   if (isCitizen) {
     return (
       <div className="citizen-app-shell">
         <header className="citizen-header">
           <div className="citizen-header-inner">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <button
+                type="button"
+                className="citizen-hamburger-btn"
+                onClick={() => setMobileOpen((prev) => !prev)}
+                aria-label={mobileOpen ? 'Close navigation menu' : 'Open navigation menu'}
+                aria-expanded={mobileOpen}
+                title="Toggle navigation"
+              >
+                {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+              </button>
+
               <div className="sidebar-brand">
                 <div className="brand-icon">
                   <ShieldAlert size={16} strokeWidth={2} />
@@ -68,10 +89,25 @@ export default function AppLayout() {
                 </div>
               </div>
 
-              <nav className="citizen-nav" aria-label="Main navigation">
+              {/* Desktop Nav (shown above 1100px) */}
+              <nav className="citizen-nav citizen-nav-desktop" aria-label="Main navigation">
                 <NavLink
                   to="/citizen"
                   end
+                  className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+                >
+                  <Home size={15} strokeWidth={1.8} className="nav-link-icon" />
+                  <span>Home</span>
+                </NavLink>
+                <NavLink
+                  to="/citizen/map"
+                  className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+                >
+                  <MapIcon size={15} strokeWidth={1.8} className="nav-link-icon" />
+                  <span>Live Map</span>
+                </NavLink>
+                <NavLink
+                  to="/citizen/requests"
                   className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
                 >
                   <ClipboardList size={15} strokeWidth={1.8} className="nav-link-icon" />
@@ -83,6 +119,26 @@ export default function AppLayout() {
                 >
                   <AlertTriangle size={15} strokeWidth={1.8} className="nav-link-icon" />
                   <span>Report emergency</span>
+                </NavLink>
+                <NavLink
+                  to="/citizen/resources"
+                  className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+                >
+                  <LifeBuoy size={15} strokeWidth={1.8} className="nav-link-icon" />
+                  <span>Resources</span>
+                </NavLink>
+                <NavLink
+                  to="/citizen/updates"
+                  className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+                  style={{ position: 'relative' }}
+                >
+                  <Bell size={15} strokeWidth={1.8} className="nav-link-icon" />
+                  <span>Updates</span>
+                  {bellCount > 0 && (
+                    <span className="bell-badge" aria-label={`${bellCount} unread notifications`}>
+                      {bellCount > 9 ? '9+' : bellCount}
+                    </span>
+                  )}
                 </NavLink>
               </nav>
             </div>
@@ -98,7 +154,7 @@ export default function AppLayout() {
                 {theme === 'dark' ? <Sun size={15} strokeWidth={1.8} /> : <Moon size={15} strokeWidth={1.8} />}
               </button>
 
-              <div className="sidebar-user-row" style={{ marginLeft: 8 }}>
+              <div className="sidebar-user-row" style={{ marginLeft: 6 }}>
                 <div className="user-avatar">{initials}</div>
                 <div className="user-details">
                   <span className="user-name">{user?.name}</span>
@@ -114,11 +170,84 @@ export default function AppLayout() {
                 style={{ marginLeft: 6 }}
               >
                 <LogOut size={13} strokeWidth={1.8} />
-                <span>Sign out</span>
+                <span className="signout-label">Sign out</span>
               </button>
             </div>
           </div>
+
+          {/* Mobile / Tablet Collapsible Menu Drawer (below 1100px) */}
+          {mobileOpen && (
+            <div className="citizen-mobile-drawer" role="dialog" aria-label="Mobile navigation">
+              <nav className="citizen-mobile-nav">
+                <NavLink
+                  to="/citizen"
+                  end
+                  className={({ isActive }) => `mobile-nav-link ${isActive ? 'active' : ''}`}
+                  onClick={() => setMobileOpen(false)}
+                >
+                  <Home size={16} strokeWidth={1.8} />
+                  <span>Home</span>
+                </NavLink>
+                <NavLink
+                  to="/citizen/map"
+                  className={({ isActive }) => `mobile-nav-link ${isActive ? 'active' : ''}`}
+                  onClick={() => setMobileOpen(false)}
+                >
+                  <MapIcon size={16} strokeWidth={1.8} />
+                  <span>Live Map</span>
+                </NavLink>
+                <NavLink
+                  to="/citizen/requests"
+                  className={({ isActive }) => `mobile-nav-link ${isActive ? 'active' : ''}`}
+                  onClick={() => setMobileOpen(false)}
+                >
+                  <ClipboardList size={16} strokeWidth={1.8} />
+                  <span>My requests</span>
+                </NavLink>
+                <NavLink
+                  to="/citizen/report"
+                  className={({ isActive }) => `mobile-nav-link ${isActive ? 'active' : ''}`}
+                  onClick={() => setMobileOpen(false)}
+                >
+                  <AlertTriangle size={16} strokeWidth={1.8} />
+                  <span>Report emergency</span>
+                </NavLink>
+                <NavLink
+                  to="/citizen/resources"
+                  className={({ isActive }) => `mobile-nav-link ${isActive ? 'active' : ''}`}
+                  onClick={() => setMobileOpen(false)}
+                >
+                  <LifeBuoy size={16} strokeWidth={1.8} />
+                  <span>Resources</span>
+                </NavLink>
+                <NavLink
+                  to="/citizen/updates"
+                  className={({ isActive }) => `mobile-nav-link ${isActive ? 'active' : ''}`}
+                  onClick={() => setMobileOpen(false)}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <Bell size={16} strokeWidth={1.8} />
+                    <span>Updates</span>
+                  </div>
+                  {bellCount > 0 && (
+                    <span className="bell-badge bell-badge-inline">
+                      {bellCount > 9 ? '9+' : bellCount}
+                    </span>
+                  )}
+                </NavLink>
+              </nav>
+            </div>
+          )}
         </header>
+
+        {mobileOpen && (
+          <div
+            className="citizen-drawer-backdrop"
+            onClick={() => setMobileOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+
 
         <main className="main-content">
           <Outlet />
@@ -166,6 +295,14 @@ export default function AppLayout() {
               >
                 <LayoutDashboard size={15} strokeWidth={1.8} className="nav-link-icon" />
                 <span>Incidents</span>
+              </NavLink>
+              <NavLink
+                to="/citizen/map"
+                className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+                onClick={closeMobile}
+              >
+                <MapIcon size={15} strokeWidth={1.8} className="nav-link-icon" />
+                <span>Live map</span>
               </NavLink>
             </>
           )}

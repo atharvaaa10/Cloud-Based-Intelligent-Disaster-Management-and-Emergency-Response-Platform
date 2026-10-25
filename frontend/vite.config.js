@@ -22,6 +22,22 @@ export default defineConfig({
           }
         },
       },
+      '/citizen': {
+        target: 'http://localhost:8000',
+        bypass: (req) => {
+          if (req.headers.accept && req.headers.accept.includes('text/html')) {
+            return '/index.html';
+          }
+        },
+      },
+      '/map': {
+        target: 'http://localhost:8000',
+        bypass: (req) => {
+          if (req.headers.accept && req.headers.accept.includes('text/html')) {
+            return '/index.html';
+          }
+        },
+      },
       '/health': 'http://localhost:8000',
     },
   },

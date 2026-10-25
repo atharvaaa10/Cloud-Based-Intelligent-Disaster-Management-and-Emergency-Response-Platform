@@ -73,6 +73,7 @@ class StatusEnum(str, enum.Enum):
     assigned = "assigned"
     in_progress = "in_progress"
     resolved = "resolved"
+    cancelled = "cancelled"
 
 
 class PlaceTypeEnum(str, enum.Enum):

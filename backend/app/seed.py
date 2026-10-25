@@ -13,7 +13,9 @@ Data summary:
 
 import asyncio
 import logging
+import random
 from datetime import datetime, timedelta, timezone
+
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -681,8 +683,12 @@ async def seed_data():
 
         created_incidents = []
         for inc_data in incidents_data:
-            created_time = _now() - timedelta(minutes=inc_data["created_offset"])
+            # Randomise incident created_at over the last 3 days (4320 minutes)
+            # Ensuring resolved/assigned incidents have enough time history
+            rand_minutes = random.randint(15, 72 * 60)
+            created_time = _now() - timedelta(minutes=rand_minutes)
             incident = Incident(
+
                 public_code=inc_data["public_code"],
                 tracking_code=inc_data["tracking_code"],
                 reporter_id=inc_data["reporter_id"],
