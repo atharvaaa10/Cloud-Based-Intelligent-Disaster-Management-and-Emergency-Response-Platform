@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     SQS_QUEUE_URL: str = ""
     SNS_TOPIC_ARN: str = ""
 
+    # ── Local file storage (used when USE_AWS=False) ─────────
+    LOCAL_UPLOAD_DIR: str = "uploads"
+
     # ── Internal Service Authentication (Lambda -> API) ──────
     INTERNAL_TOKEN: str = "dev-internal-triage-token-change-in-prod"
 

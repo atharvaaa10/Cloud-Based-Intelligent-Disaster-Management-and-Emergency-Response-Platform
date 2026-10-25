@@ -101,7 +101,7 @@ export default function LoginPage() {
             value={form.password}
             onChange={set('password')}
             required
-            minLength={6}
+            minLength={8}
             leftIcon={Lock}
             rightSlot={
               <button
@@ -119,6 +119,11 @@ export default function LoginPage() {
               </button>
             }
           />
+          {isRegister && (
+            <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: -8, marginBottom: 4 }}>
+              Min 8 characters · at least one uppercase letter or digit
+            </p>
+          )}
 
           <Button
             type="submit"

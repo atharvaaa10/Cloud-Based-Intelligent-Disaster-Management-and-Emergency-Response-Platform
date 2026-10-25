@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.audit import record_audit_event
 from app.auth import create_access_token, hash_password, verify_password
 from app.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, rate_limit_login
 from app.models import User, RoleEnum
 from app.schemas import LoginRequest, RegisterRequest, TokenResponse, UserOut
 
@@ -24,8 +24,9 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Email already registered")
 
     user = User(
-        name=body.name,
+        full_name=body.full_name or body.name,
         email=body.email,
+        phone=body.phone,
         password_hash=hash_password(body.password),
         role=RoleEnum.citizen,
     )
@@ -36,7 +37,12 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(body: LoginRequest, request: Request, db: AsyncSession = Depends(get_db)):
+async def login(
+    body: LoginRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _rl: None = Depends(rate_limit_login),
+):
     """Authenticate and return a JWT."""
     client_ip = request.client.host if request.client else None
     result = await db.execute(select(User).where(User.email == body.email))

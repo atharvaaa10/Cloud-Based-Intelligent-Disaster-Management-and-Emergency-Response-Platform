@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.models import Base
 from app.database import get_db
 from app.main import app
+from app.deps import _login_attempts
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
@@ -32,6 +33,14 @@ async def setup_db():
     yield
     async with engine_test.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
+
+
+@pytest.fixture(autouse=True)
+def reset_rate_limiter():
+    """Clear the in-memory login rate-limit state before every test."""
+    _login_attempts.clear()
+    yield
+    _login_attempts.clear()
 
 
 async def override_get_db():

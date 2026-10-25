@@ -11,21 +11,25 @@ export function AuthProvider({ children }) {
     const token = localStorage.getItem('token');
     if (!token) { setLoading(false); return; }
     api.get('/auth/me')
-      .then(setUser)
+      .then((u) => setUser(u ? { ...u, name: u.full_name || u.name || '' } : u))
       .catch(() => localStorage.removeItem('token'))
       .finally(() => setLoading(false));
   }, []);
+
+    // Normalise: backend returns full_name (canonical) + name (alias); prefer full_name
+    const normalise = (u) =>
+      u ? { ...u, name: u.full_name || u.name || '' } : u;
 
   const login = async (email, password) => {
     const data = await api.post('/auth/login', { email, password });
     localStorage.setItem('token', data.access_token);
     const me = await api.get('/auth/me');
-    setUser(me);
-    return me;
+    setUser(normalise(me));
+    return normalise(me);
   };
 
   const register = async (name, email, password) => {
-    await api.post('/auth/register', { name, email, password });
+    await api.post('/auth/register', { name, full_name: name, email, password });
     return login(email, password);
   };
 

@@ -13,6 +13,8 @@ from app.audit import record_audit_event
 
 from app.database import get_db
 from app.deps import get_current_user, require_roles
+from app.services.incident_service import IncidentService
+from app.services.storage_service import get_storage_service
 from app.models import (
     Assignment,
     Incident,
@@ -53,23 +55,21 @@ async def create_incident(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Any authenticated user can report an incident."""
-    incident = Incident(
-        reporter_id=current_user.id,
+    """Any authenticated user can report an incident. Priority and status are
+    always set server-side (pending / reported) — client values are ignored."""
+    service = IncidentService(db)
+    incident = await service.create(
         category=body.category,
         description=body.description,
-        location_text=body.location_text,
+        address=body.address,
         latitude=body.latitude,
         longitude=body.longitude,
         people_affected=body.people_affected,
         photo_key=body.photo_key,
+        reporter_id=current_user.id,
     )
-    db.add(incident)
-    await db.commit()
-    await db.refresh(incident)
 
-    # Decoupled event-driven trigger via SQS:
-    # Offload auto-triage to background worker; queue failures never block response.
+    # Decoupled SQS trigger — runs after the DB commit, failure never blocks the response.
     cat_val = incident.category.value if hasattr(incident.category, "value") else str(incident.category)
     await enqueue_incident_processing(
         incident_id=incident.id,
@@ -148,20 +148,23 @@ async def get_photo_url(
     current_user: User = Depends(get_current_user),
 ):
     """
-    Generate a presigned S3 GET URL for authorized users (reporter, admin, responder).
+    Generate a presigned GET URL for authorized users (reporter, admin, responder).
+    Enforces that only the incident owner and admins/responders can retrieve the photo URL.
     """
     result = await db.execute(select(Incident).where(Incident.id == incident_id))
     incident = result.scalar_one_or_none()
     if not incident:
         raise HTTPException(status_code=404, detail="Incident not found")
 
-    if current_user.role.value == "citizen" and incident.reporter_id != current_user.id:
+    role = current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role)
+    if role not in ["admin", "responder"] and incident.reporter_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorised to view this incident photo")
 
     if not incident.photo_key:
         raise HTTPException(status_code=404, detail="No photo attached to this incident")
 
-    download_url = generate_presigned_download_url(incident.photo_key, expires_in=300)
+    storage = get_storage_service()
+    download_url = storage.presign_download(photo_key=incident.photo_key, expires_in=300)
     return PhotoDownloadResponse(photo_url=download_url, photo_key=incident.photo_key)
 
 
@@ -229,9 +232,12 @@ async def get_incident(
 
     return IncidentDetail(
         id=incident.id,
+        public_code=incident.public_code,
+        tracking_code=incident.tracking_code,
         reporter_id=incident.reporter_id,
         category=incident.category.value if hasattr(incident.category, 'value') else incident.category,
         description=incident.description,
+        address=incident.address,
         location_text=incident.location_text,
         latitude=incident.latitude,
         longitude=incident.longitude,
@@ -239,6 +245,9 @@ async def get_incident(
         priority=incident.priority.value if hasattr(incident.priority, 'value') else incident.priority,
         status=incident.status.value if hasattr(incident.status, 'value') else incident.status,
         photo_key=incident.photo_key,
+        triage_score=incident.triage_score,
+        triage_reason=incident.triage_reason,
+        auto_triaged_at=incident.auto_triaged_at,
         created_at=incident.created_at,
         updated_at=incident.updated_at,
         reporter=UserOut.model_validate(incident.reporter) if incident.reporter else None,

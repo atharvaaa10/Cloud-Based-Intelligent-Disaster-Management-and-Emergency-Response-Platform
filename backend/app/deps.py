@@ -2,7 +2,9 @@
 Reusable FastAPI dependencies for authentication and role-based access.
 """
 
-from fastapi import Depends, HTTPException, status
+import time
+from collections import defaultdict
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -46,3 +48,34 @@ def require_roles(*allowed_roles: str):
         return current_user
 
     return _check
+
+
+# Alias: singular form for readability
+def require_role(*allowed_roles: str):
+    """Alias for require_roles. Accepts one or more role names."""
+    return require_roles(*allowed_roles)
+
+
+# ── In-memory rate limiting for login ────────────────────────────
+_login_attempts: dict[str, list[float]] = defaultdict(list)
+_RATE_LIMIT_WINDOW = 60        # seconds
+_RATE_LIMIT_MAX_ATTEMPTS = 5   # per window per IP
+
+
+def rate_limit_login(request: Request) -> None:
+    """Dependency: allow max 5 login attempts per IP per 60 seconds."""
+    ip = request.client.host if request.client else "unknown"
+    now = time.monotonic()
+    window_start = now - _RATE_LIMIT_WINDOW
+
+    # Drop timestamps outside the window
+    _login_attempts[ip] = [t for t in _login_attempts[ip] if t > window_start]
+
+    if len(_login_attempts[ip]) >= _RATE_LIMIT_MAX_ATTEMPTS:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many login attempts. Please wait a minute and try again.",
+            headers={"Retry-After": "60"},
+        )
+
+    _login_attempts[ip].append(now)

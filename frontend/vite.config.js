@@ -8,6 +8,10 @@ export default defineConfig({
     proxy: {
       '/auth': 'http://localhost:8000',
       '/incidents': 'http://localhost:8000',
+      '/uploads': 'http://localhost:8000',
+      '/notifications': 'http://localhost:8000',
+      '/places': 'http://localhost:8000',
+      '/response-teams': 'http://localhost:8000',
       '/teams': 'http://localhost:8000',
       '/resources': 'http://localhost:8000',
       '/admin/audit-log': {

@@ -26,3 +26,7 @@ dist/
 .DS_Store
 Thumbs.db
 lambda/*.zip
+
+# Uploaded files
+uploads/
+**/uploads/

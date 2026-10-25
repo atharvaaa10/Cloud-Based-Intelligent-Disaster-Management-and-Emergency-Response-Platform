@@ -213,7 +213,7 @@ async def test_health_check_endpoint(client: AsyncClient):
 
 async def test_photo_presigned_upload_and_download_stub_mode(client: AsyncClient):
     """With USE_AWS=false, photo endpoints return mock presigned URLs and store photo_key."""
-    token = await register_and_login(client, "Photo Reporter", "photo_rep@test.com", "photo123")
+    token = await register_and_login(client, "Photo Reporter", "photo_rep@test.com", "Photo123")
 
     # 1. Request presigned upload URL for a new incident
     upload_req = await client.post(

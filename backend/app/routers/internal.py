@@ -81,9 +81,9 @@ async def apply_incident_triage(
         logger.info("[TRIAGE] Incident #%d already triaged with score=%d (idempotent no-op)", incident_id, body.score)
         return incident
 
-    # 2. Check if priority is still at default (medium) and not manually assigned by an admin
+    # 2. Check if priority is still at default (pending/medium) and not manually assigned by an admin
     priority_changed = False
-    if incident.priority == PriorityEnum.medium and incident.auto_triaged_at is None:
+    if incident.priority in (PriorityEnum.pending, PriorityEnum.medium) and incident.auto_triaged_at is None:
         try:
             target_priority = PriorityEnum(body.priority.lower())
             if incident.priority != target_priority:

@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.database import get_db
-from app.routers import auth, incidents, teams, resources, internal, admin
+from app.routers import auth, incidents, teams, resources, internal, admin, places, response_teams, notifications, uploads
 
 
 class StructuredJsonFormatter(logging.Formatter):
@@ -83,6 +83,10 @@ app.include_router(auth.router)
 app.include_router(incidents.router)
 app.include_router(teams.router)
 app.include_router(resources.router)
+app.include_router(places.router)
+app.include_router(response_teams.router)
+app.include_router(notifications.router)
+app.include_router(uploads.router)
 app.include_router(internal.router)
 app.include_router(admin.router)
 
