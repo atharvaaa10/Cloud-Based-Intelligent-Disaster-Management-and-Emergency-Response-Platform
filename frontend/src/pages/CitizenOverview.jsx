@@ -30,6 +30,7 @@ import {
   Button,
   EmptyState,
   SkeletonStatCard,
+  GlobalStatRow,
   formatRelativeTime,
 } from '../components/ui';
 
@@ -183,6 +184,9 @@ export default function CitizenOverview() {
           </Button>
         </div>
       )}
+
+      {/* ── Global Disaster Operations Stat Row (5 Tinted KPIs) ── */}
+      <GlobalStatRow userCoords={userCoords} />
 
       {/* ── 2. Summary Cards for User's Own Requests (Total, Active, Resolved) ── */}
       <section aria-label="My emergency requests summary">

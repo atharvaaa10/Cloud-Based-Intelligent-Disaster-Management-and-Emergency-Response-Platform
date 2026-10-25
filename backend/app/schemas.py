@@ -435,3 +435,18 @@ class PublicMapResponse(BaseModel):
     total_places: int
 
 
+# ── Global Operations Stat Cards (Citizen Header KPIs) ────────
+
+class GlobalStatCardsOut(BaseModel):
+    active_incidents: int
+    incident_trend_pct: float
+    people_affected: int
+    total_response_teams: int
+    teams_on_ground: int
+    total_shelters: int
+    nearby_shelters_count: Optional[int] = None
+    total_supply_points: int
+    stock_level_status: str  # "Low" | "Adequate" | "Good"
+
+
+

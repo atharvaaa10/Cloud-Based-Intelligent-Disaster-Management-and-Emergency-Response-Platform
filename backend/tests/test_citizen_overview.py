@@ -173,3 +173,34 @@ async def test_citizen_overview_shelter_proximity(client: AsyncClient):
     assert shelters[0]["distance_km"] == 0.0
     assert shelters[0]["available"] is True
     assert shelters[0]["capacity"] == 400
+
+
+@pytest.mark.asyncio
+async def test_citizen_global_stats_kpis(client: AsyncClient, setup_db):
+    token = await register_and_login(client, "Global Citizen", "globalstats@example.com", "Password123")
+
+    # 1. Without coordinates
+    resp = await client.get("/citizen/stats/global", headers=auth_header(token))
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert "active_incidents" in data
+    assert "incident_trend_pct" in data
+    assert "people_affected" in data
+    assert "total_response_teams" in data
+    assert "teams_on_ground" in data
+    assert "total_shelters" in data
+    assert data["nearby_shelters_count"] is None
+    assert "total_supply_points" in data
+    assert data["stock_level_status"] in ["Low", "Adequate", "Good"]
+
+    # 2. With coordinates
+    resp_with_loc = await client.get(
+        "/citizen/stats/global?lat=18.5204&lon=73.8567",
+        headers=auth_header(token),
+    )
+    assert resp_with_loc.status_code == 200
+    data_with_loc = resp_with_loc.json()
+    assert data_with_loc["nearby_shelters_count"] is not None
+    assert isinstance(data_with_loc["nearby_shelters_count"], int)
+

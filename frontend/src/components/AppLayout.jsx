@@ -65,9 +65,10 @@ export default function AppLayout() {
   if (isCitizen) {
     return (
       <div className="citizen-app-shell">
-        <header className="citizen-header">
+        <header className="citizen-header" role="banner">
           <div className="citizen-header-inner">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {/* Left: Shield Logo Tile + Bold Title + Subtitle */}
+            <div className="citizen-header-left">
               <button
                 type="button"
                 className="citizen-hamburger-btn"
@@ -76,106 +77,108 @@ export default function AppLayout() {
                 aria-expanded={mobileOpen}
                 title="Toggle navigation"
               >
-                {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+                {mobileOpen ? <X size={18} /> : <Menu size={18} />}
               </button>
 
-              <div className="sidebar-brand">
-                <div className="brand-icon">
-                  <ShieldAlert size={16} strokeWidth={2} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div className="citizen-brand-logo" aria-hidden="true">
+                  <ShieldAlert size={18} strokeWidth={2.2} />
                 </div>
-                <div className="brand-meta">
-                  <span>DisasterResponse</span>
-                  <small>Civilian emergency portal</small>
+                <div className="citizen-brand-meta">
+                  <span className="citizen-brand-title">DisasterResponse</span>
+                  <span className="citizen-brand-sub">Civilian emergency portal</span>
                 </div>
               </div>
-
-              {/* Desktop Nav (shown above 1100px) */}
-              <nav className="citizen-nav citizen-nav-desktop" aria-label="Main navigation">
-                <NavLink
-                  to="/citizen"
-                  end
-                  className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
-                >
-                  <Home size={15} strokeWidth={1.8} className="nav-link-icon" />
-                  <span>Home</span>
-                </NavLink>
-                <NavLink
-                  to="/citizen/map"
-                  className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
-                >
-                  <MapIcon size={15} strokeWidth={1.8} className="nav-link-icon" />
-                  <span>Live Map</span>
-                </NavLink>
-                <NavLink
-                  to="/citizen/requests"
-                  className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
-                >
-                  <ClipboardList size={15} strokeWidth={1.8} className="nav-link-icon" />
-                  <span>My requests</span>
-                </NavLink>
-                <NavLink
-                  to="/citizen/report"
-                  className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
-                >
-                  <AlertTriangle size={15} strokeWidth={1.8} className="nav-link-icon" />
-                  <span>Report emergency</span>
-                </NavLink>
-                <NavLink
-                  to="/citizen/resources"
-                  className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
-                >
-                  <LifeBuoy size={15} strokeWidth={1.8} className="nav-link-icon" />
-                  <span>Resources</span>
-                </NavLink>
-                <NavLink
-                  to="/citizen/updates"
-                  className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
-                  style={{ position: 'relative' }}
-                >
-                  <Bell size={15} strokeWidth={1.8} className="nav-link-icon" />
-                  <span>Updates</span>
-                  {bellCount > 0 && (
-                    <span className="bell-badge" aria-label={`${bellCount} unread notifications`}>
-                      {bellCount > 9 ? '9+' : bellCount}
-                    </span>
-                  )}
-                </NavLink>
-              </nav>
             </div>
 
-            <div className="topbar-right">
+            {/* Center: Filled Pill Navigation (Desktop > 1100px) */}
+            <nav className="citizen-nav citizen-nav-desktop" aria-label="Civilian Portal Navigation">
+              <NavLink
+                to="/citizen"
+                end
+                className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+              >
+                <Home size={15} strokeWidth={1.9} className="nav-link-icon" />
+                <span>Home</span>
+              </NavLink>
+              <NavLink
+                to="/citizen/requests"
+                className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+              >
+                <ClipboardList size={15} strokeWidth={1.9} className="nav-link-icon" />
+                <span>My requests</span>
+              </NavLink>
+              <NavLink
+                to="/citizen/report"
+                className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+              >
+                <AlertTriangle size={15} strokeWidth={1.9} className="nav-link-icon" />
+                <span>Report emergency</span>
+              </NavLink>
+              <NavLink
+                to="/citizen/map"
+                className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+              >
+                <MapIcon size={15} strokeWidth={1.9} className="nav-link-icon" />
+                <span>Live map</span>
+              </NavLink>
+              <NavLink
+                to="/citizen/resources"
+                className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+              >
+                <LifeBuoy size={15} strokeWidth={1.9} className="nav-link-icon" />
+                <span>Resources</span>
+              </NavLink>
+              <NavLink
+                to="/citizen/updates"
+                className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+                style={{ position: 'relative' }}
+              >
+                <Bell size={15} strokeWidth={1.9} className="nav-link-icon" />
+                <span>Updates</span>
+                {bellCount > 0 && (
+                  <span className="bell-badge" aria-label={`${bellCount} unread notifications`}>
+                    {bellCount > 9 ? '9+' : bellCount}
+                  </span>
+                )}
+              </NavLink>
+            </nav>
+
+            {/* Right: Theme Toggle, User Avatar Circle + Name/Role, Outlined Sign Out */}
+            <div className="citizen-header-right">
               <button
                 type="button"
-                className="theme-toggle-btn"
+                className="citizen-theme-btn"
                 onClick={toggleTheme}
                 title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
                 aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
               >
-                {theme === 'dark' ? <Sun size={15} strokeWidth={1.8} /> : <Moon size={15} strokeWidth={1.8} />}
+                {theme === 'dark' ? <Sun size={15} strokeWidth={1.9} /> : <Moon size={15} strokeWidth={1.9} />}
               </button>
 
-              <div className="sidebar-user-row" style={{ marginLeft: 6 }}>
-                <div className="user-avatar">{initials}</div>
-                <div className="user-details">
-                  <span className="user-name">{user?.name}</span>
-                  <span className="user-role-badge">Citizen</span>
+              <div className="citizen-user-profile">
+                <div className="citizen-avatar-circle" aria-hidden="true">
+                  {initials}
+                </div>
+                <div className="citizen-user-text">
+                  <span className="citizen-user-name">{user?.name || 'Citizen'}</span>
+                  <span className="citizen-user-role">Citizen</span>
                 </div>
               </div>
 
               <button
                 type="button"
-                className="ui-btn ui-btn-outline ui-btn-sm"
+                className="citizen-signout-btn"
                 onClick={logout}
-                title="Sign out"
-                style={{ marginLeft: 6 }}
+                title="Sign out of civilian portal"
               >
-                <LogOut size={13} strokeWidth={1.8} />
-                <span className="signout-label">Sign out</span>
+                <LogOut size={13} strokeWidth={1.9} />
+                <span>Sign out</span>
               </button>
             </div>
           </div>
 
-          {/* Mobile / Tablet Collapsible Menu Drawer (below 1100px) */}
+          {/* Mobile / Tablet Drawer below 1100px */}
           {mobileOpen && (
             <div className="citizen-mobile-drawer" role="dialog" aria-label="Mobile navigation">
               <nav className="citizen-mobile-nav">
@@ -185,23 +188,15 @@ export default function AppLayout() {
                   className={({ isActive }) => `mobile-nav-link ${isActive ? 'active' : ''}`}
                   onClick={() => setMobileOpen(false)}
                 >
-                  <Home size={16} strokeWidth={1.8} />
+                  <Home size={16} strokeWidth={1.9} />
                   <span>Home</span>
-                </NavLink>
-                <NavLink
-                  to="/citizen/map"
-                  className={({ isActive }) => `mobile-nav-link ${isActive ? 'active' : ''}`}
-                  onClick={() => setMobileOpen(false)}
-                >
-                  <MapIcon size={16} strokeWidth={1.8} />
-                  <span>Live Map</span>
                 </NavLink>
                 <NavLink
                   to="/citizen/requests"
                   className={({ isActive }) => `mobile-nav-link ${isActive ? 'active' : ''}`}
                   onClick={() => setMobileOpen(false)}
                 >
-                  <ClipboardList size={16} strokeWidth={1.8} />
+                  <ClipboardList size={16} strokeWidth={1.9} />
                   <span>My requests</span>
                 </NavLink>
                 <NavLink
@@ -209,15 +204,23 @@ export default function AppLayout() {
                   className={({ isActive }) => `mobile-nav-link ${isActive ? 'active' : ''}`}
                   onClick={() => setMobileOpen(false)}
                 >
-                  <AlertTriangle size={16} strokeWidth={1.8} />
+                  <AlertTriangle size={16} strokeWidth={1.9} />
                   <span>Report emergency</span>
+                </NavLink>
+                <NavLink
+                  to="/citizen/map"
+                  className={({ isActive }) => `mobile-nav-link ${isActive ? 'active' : ''}`}
+                  onClick={() => setMobileOpen(false)}
+                >
+                  <MapIcon size={16} strokeWidth={1.9} />
+                  <span>Live map</span>
                 </NavLink>
                 <NavLink
                   to="/citizen/resources"
                   className={({ isActive }) => `mobile-nav-link ${isActive ? 'active' : ''}`}
                   onClick={() => setMobileOpen(false)}
                 >
-                  <LifeBuoy size={16} strokeWidth={1.8} />
+                  <LifeBuoy size={16} strokeWidth={1.9} />
                   <span>Resources</span>
                 </NavLink>
                 <NavLink
@@ -226,7 +229,7 @@ export default function AppLayout() {
                   onClick={() => setMobileOpen(false)}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <Bell size={16} strokeWidth={1.8} />
+                    <Bell size={16} strokeWidth={1.9} />
                     <span>Updates</span>
                   </div>
                   {bellCount > 0 && (

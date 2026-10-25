@@ -2,7 +2,7 @@
 Citizen router — Citizen overview dashboard, personal stats, and public safety data.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import math
 from typing import Optional
 
@@ -12,11 +12,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.deps import get_current_user
-from app.models import Incident, Place, PlaceTypeEnum, StatusEnum, User
+from app.models import Incident, Place, PlaceTypeEnum, ResponseTeam, StatusEnum, TeamStatusEnum, User
 from app.schemas import (
     AnnouncementOut,
     CitizenOverviewOut,
     CitizenStats,
+    GlobalStatCardsOut,
     IncidentOut,
     NearbyShelterOut,
 )
@@ -195,3 +196,110 @@ async def get_citizen_overview(
             "source": loc_source,
         },
     )
+
+
+@router.get("/stats/global", response_model=GlobalStatCardsOut)
+async def get_global_stats(
+    lat: Optional[float] = Query(None, description="Citizen latitude"),
+    lon: Optional[float] = Query(None, description="Citizen longitude"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Returns live aggregated KPIs for the citizen portal stat cards row:
+    1. Active incidents count & trend (% from last 24h)
+    2. Total people affected (single estimated value from active reports)
+    3. Response teams total & on ground (busy)
+    4. Shelters total & nearby count (if lat/lon provided)
+    5. Relief supply points count & overall stock level status
+    """
+    now = datetime.now(timezone.utc)
+    one_day_ago = now - timedelta(hours=24)
+    two_days_ago = now - timedelta(hours=48)
+
+    # 1. Active Incidents (reported, under_review, assigned, in_progress)
+    active_statuses = [
+        StatusEnum.reported,
+        StatusEnum.under_review,
+        StatusEnum.assigned,
+        StatusEnum.in_progress,
+    ]
+    active_incidents_q = select(func.count(Incident.id)).where(Incident.status.in_(active_statuses))
+    active_incidents_res = await db.execute(active_incidents_q)
+    active_incidents_count = active_incidents_res.scalar() or 0
+
+    # Trend: incidents created in last 24h vs previous 24h
+    incidents_last_24h_q = select(func.count(Incident.id)).where(
+        Incident.created_at >= one_day_ago
+    )
+    incidents_prev_24h_q = select(func.count(Incident.id)).where(
+        Incident.created_at >= two_days_ago,
+        Incident.created_at < one_day_ago,
+    )
+    c_last_24h = (await db.execute(incidents_last_24h_q)).scalar() or 0
+    c_prev_24h = (await db.execute(incidents_prev_24h_q)).scalar() or 0
+
+    if c_prev_24h == 0:
+        trend_pct = float(c_last_24h * 10) if c_last_24h > 0 else 0.0
+    else:
+        trend_pct = round(((c_last_24h - c_prev_24h) / c_prev_24h) * 100.0, 1)
+
+    # 2. People Affected (sum of people_affected from active incidents)
+    affected_q = select(func.sum(Incident.people_affected)).where(Incident.status.in_(active_statuses))
+    affected_res = await db.execute(affected_q)
+    total_people_affected = affected_res.scalar() or 0
+
+    # 3. Response Teams (total & busy / on-ground)
+    teams_total_q = select(func.count(ResponseTeam.id))
+    teams_total = (await db.execute(teams_total_q)).scalar() or 0
+
+    teams_busy_q = select(func.count(ResponseTeam.id)).where(ResponseTeam.status == TeamStatusEnum.busy)
+    teams_on_ground = (await db.execute(teams_busy_q)).scalar() or 0
+
+    # 4. Shelters
+    shelters_q = select(Place).where(
+        Place.type == PlaceTypeEnum.shelter,
+        Place.available == True,
+    )
+    shelters_res = await db.execute(shelters_q)
+    shelters_list = shelters_res.scalars().all()
+    total_shelters = len(shelters_list)
+
+    nearby_shelters_count = None
+    if lat is not None and lon is not None:
+        # Count shelters within 10 km
+        nearby_shelters_count = sum(
+            1 for s in shelters_list if haversine_km(lat, lon, s.latitude, s.longitude) <= 10.0
+        )
+
+    # 5. Relief Supplies & Stock Level
+    supplies_q = select(Place).where(Place.type == PlaceTypeEnum.relief_supply)
+    supplies_res = await db.execute(supplies_q)
+    supplies_list = supplies_res.scalars().all()
+    total_supply_points = len(supplies_list)
+
+    # Stock level calculation based on capacity and availability
+    if total_supply_points == 0:
+        stock_status = "Adequate"
+    else:
+        available_pts = sum(1 for p in supplies_list if p.available)
+        avail_ratio = available_pts / total_supply_points
+        if avail_ratio >= 0.75:
+            stock_status = "Good"
+        elif avail_ratio >= 0.4:
+            stock_status = "Adequate"
+        else:
+            stock_status = "Low"
+
+    return GlobalStatCardsOut(
+        active_incidents=active_incidents_count,
+        incident_trend_pct=trend_pct,
+        people_affected=total_people_affected,
+        total_response_teams=teams_total,
+        teams_on_ground=teams_on_ground,
+        total_shelters=total_shelters,
+        nearby_shelters_count=nearby_shelters_count,
+        total_supply_points=total_supply_points,
+        stock_level_status=stock_status,
+    )
+

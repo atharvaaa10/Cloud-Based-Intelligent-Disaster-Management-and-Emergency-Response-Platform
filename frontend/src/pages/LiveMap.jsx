@@ -48,6 +48,7 @@ import {
   Select,
   EmptyState,
   SkeletonStatCard,
+  GlobalStatRow,
   formatRelativeTime,
 } from '../components/ui';
 
@@ -184,6 +185,10 @@ export default function LiveMap() {
   const [selectedType, setSelectedType] = useState(null); // 'own' | 'public' | 'place' | 'zone'
   const [userLocation, setUserLocation] = useState(null); // { lat, lon }
   const [locating, setLocating] = useState(false);
+
+  // Responsive Drawer & Mobile View State
+  const [leftDrawerOpen, setLeftDrawerOpen] = useState(false);
+  const [mobileTab, setMobileTab] = useState('map'); // 'map' | 'list'
 
   // Leaflet references
   const mapContainerRef = useRef(null);
@@ -604,6 +609,12 @@ export default function LiveMap() {
   const handleSelectIncident = (item) => {
     setSelectedItem(item);
     setSelectedType(item.isOwn ? 'own' : 'public');
+    setLeftDrawerOpen(false); // Close drawer on tablet if open
+
+    // On mobile, keep track of selection for bottom sheet
+    if (window.innerWidth <= 600) {
+      setMobileTab('map');
+    }
 
     if (mapInstanceRef.current && item.displayLat != null && item.displayLon != null) {
       mapInstanceRef.current.flyTo([item.displayLat, item.displayLon], 15, {
@@ -672,126 +683,48 @@ export default function LiveMap() {
 
   return (
     <div className="live-map-wrapper">
-      {/* ── 1. Top Stat Cards ── */}
-      <section className="live-map-stats-grid" aria-label="Live map incident statistics">
-        {loading ? (
-          <>
-            <SkeletonStatCard />
-            <SkeletonStatCard />
-            <SkeletonStatCard />
-            <SkeletonStatCard />
-          </>
-        ) : (
-          <>
-            <div className="ui-stat-card ui-stat-default" id="stat-visible-incidents">
-              <div className="ui-stat-header">
-                <span className="ui-stat-label">Total Incidents</span>
-                <MapPin size={16} strokeWidth={1.8} className="ui-stat-icon" />
-              </div>
-              <div className="ui-stat-value">{stats.total}</div>
-              <div className="ui-stat-meta">In selected area &bull; Active filters</div>
-            </div>
+      {/* ── 1. Top Stat Cards (Reference Tinted 5-Card Row) ── */}
+      <GlobalStatRow userCoords={userCoords} />
 
-            <div className="ui-stat-card ui-stat-critical" id="stat-active-emergencies">
-              <div className="ui-stat-header">
-                <span className="ui-stat-label">Active Emergencies</span>
-                <AlertTriangle size={16} strokeWidth={1.8} className="ui-stat-icon" style={{ color: 'var(--critical-default)' }} />
-              </div>
-              <div className="ui-stat-value">{stats.active}</div>
-              <div className="ui-stat-meta">In response &bull; Evacuations active</div>
-            </div>
-
-            <div className="ui-stat-card ui-stat-warning" id="stat-people-affected">
-              <div className="ui-stat-header">
-                <span className="ui-stat-label">People in Need</span>
-                <Users size={16} strokeWidth={1.8} className="ui-stat-icon" style={{ color: 'var(--warning-default)' }} />
-              </div>
-              <div className="ui-stat-value">{stats.peopleAffected}</div>
-              <div className="ui-stat-meta">Estimated, from public reports</div>
-            </div>
-
-            <div className="ui-stat-card ui-stat-success" id="stat-open-shelters">
-              <div className="ui-stat-header">
-                <span className="ui-stat-label">Open Shelters</span>
-                <Home size={16} strokeWidth={1.8} className="ui-stat-icon" style={{ color: 'var(--success-default)' }} />
-              </div>
-              <div className="ui-stat-value">{stats.openShelters}</div>
-              <div className="ui-stat-meta">Refuge centers with available beds</div>
-            </div>
-          </>
-        )}
-      </section>
-
-      {/* ── 2. Filters & Actions Toolbar ── */}
-      <div className="live-map-toolbar">
-        {/* Left Filter Controls */}
-        <div className="map-filter-group">
-          {/* Search Input */}
-          <div style={{ position: 'relative', width: 220 }}>
-            <Search
-              size={14}
-              style={{
-                position: 'absolute',
-                left: 10,
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: 'var(--text-muted)',
-              }}
-            />
-            <input
-              type="text"
-              placeholder="Search code, area..."
-              className="ui-input"
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setPage(1);
-              }}
-              style={{ paddingLeft: 30, height: 32, fontSize: 'var(--text-xs)' }}
-              id="map-search-input"
-            />
+      {/* ── 2. Top Action Controls (Locate Me, Tiles, Drawer Toggle) ── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {/* Mobile Tab Toggle: Map vs List */}
+          <div className="ui-btn-group mobile-only-toggle" style={{ display: 'none' }}>
+            <button
+              type="button"
+              className={`ui-btn ui-btn-sm ${mobileTab === 'map' ? 'ui-btn-primary' : 'ui-btn-secondary'}`}
+              onClick={() => setMobileTab('map')}
+              style={{ height: 32, fontSize: 'var(--text-xs)', padding: '0 12px' }}
+            >
+              <MapIcon size={13} />
+              <span>Map</span>
+            </button>
+            <button
+              type="button"
+              className={`ui-btn ui-btn-sm ${mobileTab === 'list' ? 'ui-btn-primary' : 'ui-btn-secondary'}`}
+              onClick={() => setMobileTab('list')}
+              style={{ height: 32, fontSize: 'var(--text-xs)', padding: '0 12px' }}
+            >
+              <List size={13} />
+              <span>List ({filteredIncidents.length})</span>
+            </button>
           </div>
 
-          {/* Priority Dropdown */}
-          <select
-            className="ui-select"
-            value={selectedPriority}
-            onChange={(e) => {
-              setSelectedPriority(e.target.value);
-              setPage(1);
-            }}
-            style={{ width: 130, height: 32, fontSize: 'var(--text-xs)' }}
-            id="map-priority-filter"
+          {/* Tablet Drawer Toggle Button */}
+          <button
+            type="button"
+            className="tablet-drawer-toggle-btn"
+            onClick={() => setLeftDrawerOpen((prev) => !prev)}
+            style={{ display: 'none' }}
+            aria-label="Toggle Incidents List Drawer"
           >
-            <option value="">All Priorities</option>
-            <option value="critical">Critical</option>
-            <option value="high">High</option>
-            <option value="medium">Medium</option>
-            <option value="low">Low</option>
-          </select>
-
-          {/* Status Dropdown */}
-          <select
-            className="ui-select"
-            value={selectedStatus}
-            onChange={(e) => {
-              setSelectedStatus(e.target.value);
-              setPage(1);
-            }}
-            style={{ width: 140, height: 32, fontSize: 'var(--text-xs)' }}
-            id="map-status-filter"
-          >
-            <option value="">All Statuses</option>
-            <option value="reported">Reported</option>
-            <option value="under_review">Under Review</option>
-            <option value="assigned">Assigned</option>
-            <option value="in_progress">In Progress</option>
-            <option value="resolved">Resolved</option>
-          </select>
+            <List size={14} />
+            <span>Incidents ({filteredIncidents.length})</span>
+          </button>
         </div>
 
-        {/* Right Toolbar: Locate Me, Tile Toggle, Map/List View Mode */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
           <Button
             variant="outline"
             size="sm"
@@ -805,224 +738,299 @@ export default function LiveMap() {
             <span>{locating ? 'Locating...' : 'Locate Me'}</span>
           </Button>
 
-          {/* Tile Toggle (Dark, Satellite, Street) */}
-          {viewMode === 'map' && (
-            <div className="ui-btn-group" style={{ display: 'inline-flex' }}>
-              <button
-                type="button"
-                className={`ui-btn ui-btn-sm ${tileType === 'street' ? 'ui-btn-primary' : 'ui-btn-secondary'}`}
-                style={{ height: 32, fontSize: 'var(--text-xs)', padding: '0 8px' }}
-                onClick={() => {
-                  setTileType('street');
-                  setUserOverrodeTile(true);
-                }}
-                title="OpenStreetMap Standard"
-              >
-                Street
-              </button>
-              <button
-                type="button"
-                className={`ui-btn ui-btn-sm ${tileType === 'dark' ? 'ui-btn-primary' : 'ui-btn-secondary'}`}
-                style={{ height: 32, fontSize: 'var(--text-xs)', padding: '0 8px' }}
-                onClick={() => {
-                  setTileType('dark');
-                  setUserOverrodeTile(true);
-                }}
-                title="Dark Map (OpenStreetMap with Dark Filter)"
-              >
-                Dark
-              </button>
-
-              <button
-                type="button"
-                className={`ui-btn ui-btn-sm ${tileType === 'satellite' ? 'ui-btn-primary' : 'ui-btn-secondary'}`}
-                style={{ height: 32, fontSize: 'var(--text-xs)', padding: '0 8px' }}
-                onClick={() => {
-                  setTileType('satellite');
-                  setUserOverrodeTile(true);
-                }}
-                title="Esri World Imagery"
-              >
-                Satellite
-              </button>
-            </div>
-          )}
-
-          {/* Map View vs List View Mode Toggle */}
+          {/* Tile Toggle (Street, Dark, Satellite) */}
           <div className="ui-btn-group" style={{ display: 'inline-flex' }}>
             <button
               type="button"
-              className={`ui-btn ui-btn-sm ${viewMode === 'map' ? 'ui-btn-primary' : 'ui-btn-secondary'}`}
-              style={{ height: 32, fontSize: 'var(--text-xs)', padding: '0 8px' }}
+              className={`ui-btn ui-btn-sm ${tileType === 'street' ? 'ui-btn-primary' : 'ui-btn-secondary'}`}
+              style={{ height: 32, fontSize: 'var(--text-xs)', padding: '0 9px' }}
               onClick={() => {
-                setMapError(false);
-                setViewMode('map');
+                setTileType('street');
+                setUserOverrodeTile(true);
               }}
-              title="Live Map view"
-              id="btn-view-map"
+              title="OpenStreetMap Standard"
             >
-              <MapIcon size={13} />
-              <span>Map</span>
+              Street
             </button>
             <button
               type="button"
-              className={`ui-btn ui-btn-sm ${viewMode === 'list' ? 'ui-btn-primary' : 'ui-btn-secondary'}`}
-              style={{ height: 32, fontSize: 'var(--text-xs)', padding: '0 8px' }}
-              onClick={() => setViewMode('list')}
-              title="Fallback / Tabular List view"
-              id="btn-view-list"
+              className={`ui-btn ui-btn-sm ${tileType === 'dark' ? 'ui-btn-primary' : 'ui-btn-secondary'}`}
+              style={{ height: 32, fontSize: 'var(--text-xs)', padding: '0 9px' }}
+              onClick={() => {
+                setTileType('dark');
+                setUserOverrodeTile(true);
+              }}
+              title="Dark Mode (OpenStreetMap with Dark Filter)"
             >
-              <List size={13} />
-              <span>List</span>
+              Dark
+            </button>
+            <button
+              type="button"
+              className={`ui-btn ui-btn-sm ${tileType === 'satellite' ? 'ui-btn-primary' : 'ui-btn-secondary'}`}
+              style={{ height: 32, fontSize: 'var(--text-xs)', padding: '0 9px' }}
+              onClick={() => {
+                setTileType('satellite');
+                setUserOverrodeTile(true);
+              }}
+              title="Esri World Imagery"
+            >
+              Satellite
             </button>
           </div>
         </div>
       </div>
 
-      {/* ── 3. Category Filter Chips Bar ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
-        {CATEGORIES.map((cat) => {
-          const Icon = cat.icon;
-          const isActive = selectedCategory === cat.id;
-          return (
-            <button
-              key={cat.id || 'all'}
-              type="button"
-              className={`category-chip-btn ${isActive ? 'active' : ''}`}
-              onClick={() => {
-                setSelectedCategory(cat.id);
-                setPage(1);
-              }}
-              id={`cat-chip-${cat.id || 'all'}`}
-            >
-              <Icon size={13} />
-              <span>{cat.label}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* ── 4. Main View: Map Mode OR Fallback List Mode ── */}
-      {viewMode === 'map' && !mapError ? (
-        <div className="live-map-main-area">
-          {/* Left Panel: Filtered Incidents List with Pagination */}
-          <aside className="map-left-list-panel" aria-label="Incident directory">
-            <div className="map-left-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600 }}>
-                  Public incidents ({publicIncidentCount})
-                </span>
-                {myReportCount > 0 && (
-                  <span
-                    className="ui-badge"
-                    style={{ background: '#f59e0b', color: '#000', fontSize: 10, padding: '1px 6px', fontWeight: 700 }}
-                  >
-                    My Reports ({myReportCount})
-                  </span>
-                )}
-              </div>
-              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                Page {page} of {totalPages}
+      {/* ── 3. Main View: 3-Column Grid (Left: 26%, Center: Flex, Right: 22%) ── */}
+      <div className="live-map-main-area">
+        {/* Left Panel: Incidents Directory (26%) */}
+        <aside
+          className={`map-left-list-panel ${leftDrawerOpen ? 'drawer-open' : ''} ${mobileTab === 'list' ? 'mobile-visible' : ''}`}
+          aria-label="Incidents Directory"
+        >
+          {/* Header Top: Title + Category Chips + Search + 2 Dropdowns */}
+          <div className="map-left-header-top">
+            <div className="map-left-title-row">
+              <span className="map-left-title">
+                Incidents <small style={{ fontWeight: 500, fontSize: 12, color: 'var(--text-secondary)' }}>({filteredIncidents.length})</small>
               </span>
-            </div>
-
-            <div className="map-incident-scroll">
-              {filteredIncidents.length === 0 ? (
-                <div style={{ padding: 'var(--space-6)', textAlign: 'center', color: 'var(--text-muted)' }}>
-                  <p style={{ fontSize: 'var(--text-xs)' }}>No incidents match active filters.</p>
-                </div>
-              ) : (
-                paginatedIncidents.map((item) => {
-                  const CatIcon = CATEGORY_ICONS[item.category] || HelpCircle;
-                  const isSelected = selectedItem?.id === item.id;
-                  const dist = userLocation
-                    ? haversineKm(userLocation.lat, userLocation.lon, item.displayLat, item.displayLon)
-                    : null;
-
-                  return (
-                    <div
-                      key={`${item.isOwn ? 'own' : 'pub'}-${item.id}`}
-                      className={`map-incident-card ${isSelected ? 'is-selected' : ''} ${item.isOwn ? 'is-own' : ''}`}
-                      onClick={() => handleSelectIncident(item)}
-                      role="button"
-                      tabIndex={0}
-                      id={`list-card-${item.public_code}`}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', fontWeight: 700 }}>
-                            {item.public_code}
-                          </span>
-                          {item.isOwn && (
-                            <span
-                              className="ui-badge"
-                              style={{ background: '#f59e0b', color: '#000', fontSize: 9, padding: '1px 5px', fontWeight: 800 }}
-                            >
-                              MY REPORT
-                            </span>
-                          )}
-                        </div>
-
-                        <span
-                          className={`ui-badge ui-badge-prio-${item.priority || 'pending'}`}
-                          style={{ fontSize: 10, padding: '1px 6px' }}
-                        >
-                          {item.priority || 'pending'}
-                        </span>
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
-                        <CatIcon size={12} style={{ color: CATEGORY_COLORS[item.category] }} />
-                        <span style={{ textTransform: 'capitalize' }}>{item.category?.replace('_', ' ')}</span>
-                        <span>&bull;</span>
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 170 }}>
-                          {item.displayArea}
-                        </span>
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-muted)', paddingTop: 2 }}>
-                        <span>{formatRelativeTime(item.created_at)}</span>
-                        {userLocation ? (
-                          dist != null ? <span>~{dist} km away</span> : null
-                        ) : (
-                          <span style={{ fontSize: 10, fontStyle: 'italic', color: 'var(--text-tertiary)' }}>
-                            Enable location to see distance
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })
+              {leftDrawerOpen && (
+                <button
+                  type="button"
+                  onClick={() => setLeftDrawerOpen(false)}
+                  style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex' }}
+                  aria-label="Close drawer"
+                >
+                  <X size={16} />
+                </button>
               )}
             </div>
 
-            {/* Pagination Controls */}
-            {totalPages > 1 && (
-              <div className="map-pagination-footer">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page <= 1}
-                  style={{ padding: '2px 8px', fontSize: 11 }}
-                >
-                  <ChevronLeft size={13} /> Prev
-                </Button>
-                <span>
-                  {page} / {totalPages}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page >= totalPages}
-                  style={{ padding: '2px 8px', fontSize: 11 }}
-                >
-                  Next <ChevronRight size={13} />
-                </Button>
+            {/* Category Chips: All, Rescue, Medical, Food & Water, Shelter, Other */}
+            <div className="map-category-chips-scroll" role="tablist" aria-label="Category filter">
+              {[
+                { id: '', label: 'All' },
+                { id: 'rescue', label: 'Rescue' },
+                { id: 'medical', label: 'Medical' },
+                { id: 'food_water', label: 'Food & Water' },
+                { id: 'shelter', label: 'Shelter' },
+                { id: 'other', label: 'Other' },
+              ].map((cat) => {
+                const isActive = selectedCategory === cat.id;
+                return (
+                  <button
+                    key={cat.id || 'all'}
+                    type="button"
+                    className={`category-chip-pill ${isActive ? 'active' : ''}`}
+                    onClick={() => {
+                      setSelectedCategory(cat.id);
+                      setPage(1);
+                    }}
+                    role="tab"
+                    aria-selected={isActive}
+                  >
+                    <span>{cat.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Search Input: Search incidents by location or ID... */}
+            <div className="map-search-wrap">
+              <Search size={14} className="map-search-icon" aria-hidden="true" />
+              <input
+                type="text"
+                placeholder="Search incidents by location or ID..."
+                className="map-search-input"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setPage(1);
+                }}
+                id="incidents-search-input"
+              />
+            </div>
+
+            {/* Two Dropdowns: Priority and Status */}
+            <div className="map-dropdowns-row">
+              <select
+                className="map-select-filter"
+                value={selectedPriority}
+                onChange={(e) => {
+                  setSelectedPriority(e.target.value);
+                  setPage(1);
+                }}
+                id="incidents-filter-priority"
+                aria-label="Filter by priority"
+              >
+                <option value="">Priority: All</option>
+                <option value="critical">Critical</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+
+              <select
+                className="map-select-filter"
+                value={selectedStatus}
+                onChange={(e) => {
+                  setSelectedStatus(e.target.value);
+                  setPage(1);
+                }}
+                id="incidents-filter-status"
+                aria-label="Filter by status"
+              >
+                <option value="">Status: All</option>
+                <option value="reported">Reported</option>
+                <option value="under_review">Under Review</option>
+                <option value="assigned">Assigned</option>
+                <option value="in_progress">In Progress</option>
+                <option value="resolved">Resolved</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Incident Cards Scrollable Area */}
+          <div className="map-incident-scroll" role="list" aria-label="Incident cards">
+            {loading ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 8 }}>
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} style={{ padding: 12, borderRadius: 10, background: 'var(--bg-canvas)', border: '1px solid var(--border-default)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <div style={{ width: 80, height: 14, background: 'var(--border-default)', borderRadius: 4 }} />
+                      <div style={{ width: 50, height: 14, background: 'var(--border-default)', borderRadius: 4 }} />
+                    </div>
+                    <div style={{ width: '70%', height: 16, background: 'var(--border-default)', borderRadius: 4, marginBottom: 6 }} />
+                    <div style={{ width: '50%', height: 12, background: 'var(--border-default)', borderRadius: 4 }} />
+                  </div>
+                ))}
               </div>
+            ) : filteredIncidents.length === 0 ? (
+              <div style={{ padding: '36px 16px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                <p style={{ fontSize: 13, fontWeight: 500 }}>No incidents found.</p>
+                <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                  Try resetting the search query or category filters.
+                </p>
+              </div>
+            ) : (
+              paginatedIncidents.map((item) => {
+                const CatIcon = CATEGORY_ICONS[item.category] || HelpCircle;
+                const isSelected = selectedItem?.id === item.id;
+                const catColor = CATEGORY_COLORS[item.category] || 'var(--primary-accent, #0EA5F5)';
+
+                // Title: for own incidents, show actual description or category headline;
+                // for public incidents, show category and general area
+                const cardTitle = item.isOwn
+                  ? (item.description ? item.description.slice(0, 50) + (item.description.length > 50 ? '...' : '') : `${item.category?.replace('_', ' ')} incident`)
+                  : `${item.category?.replace('_', ' ')} emergency in ${item.displayArea}`;
+
+                return (
+                  <div
+                    key={`${item.isOwn ? 'own' : 'pub'}-${item.id}`}
+                    className={`map-incident-card-item ${isSelected ? 'is-selected' : ''} ${item.isOwn ? 'is-mine' : ''}`}
+                    onClick={() => handleSelectIncident(item)}
+                    role="button"
+                    tabIndex={0}
+                    id={`incident-card-${item.public_code}`}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleSelectIncident(item);
+                      }
+                    }}
+                  >
+                    {/* Left Icon Tile colored by category */}
+                    <div
+                      className="map-card-cat-tile"
+                      style={{
+                        backgroundColor: `${catColor}20`,
+                        color: catColor,
+                        border: `1px solid ${catColor}40`,
+                      }}
+                      aria-hidden="true"
+                    >
+                      <CatIcon size={16} strokeWidth={2} />
+                    </div>
+
+                    {/* Card Content: Top Row, Bold Title, Location, Time */}
+                    <div className="map-card-content">
+                      <div className="map-card-top-row">
+                        <div className="map-card-code-group">
+                          <span className="map-card-code">{item.public_code}</span>
+                          {item.isOwn && <span className="map-tag-mine">Mine</span>}
+                          <span className={`ui-badge ui-badge-prio-${item.priority || 'pending'}`} style={{ fontSize: 9.5, padding: '1px 5px' }}>
+                            {item.priority || 'pending'}
+                          </span>
+                        </div>
+                        <span className="map-card-time">{formatRelativeTime(item.created_at)}</span>
+                      </div>
+
+                      <div className="map-card-title" title={cardTitle}>
+                        {cardTitle}
+                      </div>
+
+                      <div className="map-card-loc" title={item.displayArea}>
+                        <MapPin size={11} style={{ flexShrink: 0, color: 'var(--text-muted)' }} />
+                        <span>{item.displayArea}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
             )}
-          </aside>
+          </div>
+
+          {/* Numbered Pagination at Bottom (1 2 3 ... next) */}
+          {totalPages > 1 && (
+            <div className="map-pagination-bar" aria-label="Pagination Navigation">
+              <button
+                type="button"
+                className="map-page-num-btn"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                aria-label="Previous page"
+              >
+                <ChevronLeft size={13} />
+              </button>
+
+              {Array.from({ length: totalPages }, (_, idx) => idx + 1).map((pageNum) => {
+                // Show first, last, current, and adjacent pages
+                if (
+                  pageNum === 1 ||
+                  pageNum === totalPages ||
+                  (pageNum >= page - 1 && pageNum <= page + 1)
+                ) {
+                  return (
+                    <button
+                      key={pageNum}
+                      type="button"
+                      className={`map-page-num-btn ${page === pageNum ? 'active' : ''}`}
+                      onClick={() => setPage(pageNum)}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                } else if (pageNum === page - 2 || pageNum === page + 2) {
+                  return (
+                    <span key={pageNum} style={{ fontSize: 11, color: 'var(--text-muted)', padding: '0 2px' }}>
+                      &hellip;
+                    </span>
+                  );
+                }
+                return null;
+              })}
+
+              <button
+                type="button"
+                className="map-page-num-btn"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                aria-label="Next page"
+              >
+                <ChevronRight size={13} />
+              </button>
+            </div>
+          )}
+        </aside>
 
           {/* Center Map Viewport */}
           <main className="map-viewport-container" aria-label="Interactive map representation">
@@ -1151,9 +1159,12 @@ export default function LiveMap() {
             )}
           </main>
 
-          {/* Right Panel: Selected Item Detail & Nearby Resources */}
+          {/* Right Panel: Selected Item Detail & Nearby Resources (22%) */}
           {selectedItem && (
-            <aside className="map-right-panel" aria-label="Selected item details">
+            <aside
+              className={`map-right-panel ${selectedItem ? 'drawer-open bottom-sheet-open' : ''}`}
+              aria-label="Selected item details"
+            >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-default)', paddingBottom: 'var(--space-2)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{ fontWeight: 700, fontSize: 'var(--text-sm)' }}>
@@ -1164,8 +1175,8 @@ export default function LiveMap() {
                       : `${selectedItem.public_code}`}
                   </span>
                   {selectedType === 'own' && (
-                    <span className="ui-badge" style={{ background: '#f59e0b', color: '#000', fontSize: 9, fontWeight: 800 }}>
-                      YOUR REPORT
+                    <span className="map-tag-mine">
+                      Mine
                     </span>
                   )}
                 </div>
@@ -1401,94 +1412,7 @@ export default function LiveMap() {
             </aside>
           )}
         </div>
-      ) : (
-        /* ── Fallback List View ── */
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', background: 'var(--bg-surface)', padding: 'var(--space-4)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-default)', overflowY: 'auto' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <h3 style={{ margin: 0, fontSize: 'var(--text-base)', fontWeight: 700 }}>
-                Incident Directory (Fallback View)
-              </h3>
-              <small style={{ color: 'var(--text-muted)' }}>
-                Showing {filteredIncidents.length} incidents across Pune disaster response grid
-              </small>
-            </div>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setMapError(false);
-                setViewMode('map');
-              }}
-            >
-              <MapIcon size={14} /> Back to Live Map
-            </Button>
-          </div>
-
-          <div className="ui-table-container">
-            <table className="ui-table">
-              <thead>
-                <tr>
-                  <th>Public Code</th>
-                  <th>Category</th>
-                  <th>General Area</th>
-                  <th>Priority</th>
-                  <th>Status</th>
-                  <th>People Affected</th>
-                  <th>Reported Time</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredIncidents.map((item) => (
-                  <tr key={`${item.isOwn ? 'own' : 'pub'}-${item.id}`}>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
-                      {item.public_code}
-                      {item.isOwn && (
-                        <span className="ui-badge" style={{ background: '#f59e0b', color: '#000', fontSize: 9, marginLeft: 6, fontWeight: 800 }}>
-                          MY REPORT
-                        </span>
-                      )}
-                    </td>
-                    <td>
-                      <span className="ui-badge" style={{ textTransform: 'capitalize' }}>
-                        {item.category?.replace('_', ' ')}
-                      </span>
-                    </td>
-                    <td>{item.displayArea}</td>
-                    <td>
-                      <span className={`ui-badge ui-badge-prio-${item.priority}`}>
-                        {item.priority}
-                      </span>
-                    </td>
-                    <td>
-                      <span className={`ui-badge ui-badge-status-${item.status}`}>
-                        {item.status}
-                      </span>
-                    </td>
-                    <td>{item.people_affected || 'N/A'}</td>
-                    <td>{formatRelativeTime(item.created_at)}</td>
-                    <td>
-                      {item.isOwn ? (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => navigate(`/citizen/requests?search=${item.public_code}`)}
-                        >
-                          <Eye size={13} /> View Detail
-                        </Button>
-                      ) : (
-                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Public Marker</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
+

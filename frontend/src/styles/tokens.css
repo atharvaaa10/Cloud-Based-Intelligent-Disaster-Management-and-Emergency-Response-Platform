@@ -45,6 +45,37 @@
   /* -- Radius XL (citizen page cards) -- */
   --radius-xl: 12px;
 
+  /* ── Reference Design System Tokens (DisasterResponse Ops Portal) ── */
+  --primary-accent: #0EA5F5;
+  --nav-active-bg: #10345C;
+  --nav-active-text: #38BDF8;
+
+  /* Stat Card Tints (Dark Ops Reference) */
+  --tint-red-bg: #2A1218;
+  --tint-red-border: #4D1A23;
+  --tint-red-icon-bg: rgba(239, 68, 68, 0.2);
+  --tint-red-icon: #EF4444;
+
+  --tint-amber-bg: #2A200E;
+  --tint-amber-border: #4D3814;
+  --tint-amber-icon-bg: rgba(245, 158, 11, 0.2);
+  --tint-amber-icon: #F59E0B;
+
+  --tint-green-bg: #0E2A22;
+  --tint-green-border: #154D3C;
+  --tint-green-icon-bg: rgba(34, 197, 94, 0.2);
+  --tint-green-icon: #22C55E;
+
+  --tint-blue-bg: #0E2240;
+  --tint-blue-border: #183C6E;
+  --tint-blue-icon-bg: rgba(14, 165, 245, 0.2);
+  --tint-blue-icon: #0EA5F5;
+
+  --tint-purple-bg: #1E1840;
+  --tint-purple-border: #352B6E;
+  --tint-purple-icon-bg: rgba(139, 92, 246, 0.2);
+  --tint-purple-icon: #8B5CF6;
+
   /* -- Alias tokens for citizen portal pages -- */
   --bg-elevated: #ffffff;
   --bg-hover: #f5f5f4;
@@ -54,7 +85,6 @@
   --accent-primary: #0284c7;
   --status-critical: #dc2626;
   --status-resolved: #059669;
-
 
   /* ── Light Theme (Default) ───────────────────────────────────── */
   --bg-canvas: #fafaf9;
@@ -135,27 +165,27 @@
 
 /* ── Dark Theme (data-theme="dark") ───────────────────────────── */
 [data-theme="dark"] {
-  --bg-canvas: #0c0a09;
-  --bg-surface: #1c1917;
-  --bg-surface-subdued: #292524;
-  --bg-surface-hover: #292524;
-  --bg-surface-active: #44403c;
+  --bg-canvas: #0A1020;
+  --bg-surface: #0F1830;
+  --bg-surface-subdued: #142041;
+  --bg-surface-hover: #162447;
+  --bg-surface-active: #1D2E5C;
 
-  --border-subtle: #292524;
-  --border-default: #44403c;
-  --border-hover: #57534e;
-  --border-focus: #38bdf8;
+  --border-subtle: #142041;
+  --border-default: #1F2D4D;
+  --border-hover: #2E426D;
+  --border-focus: #0EA5F5;
 
-  --text-primary: #fafaf9;
-  --text-secondary: #a8a29e;
-  --text-tertiary: #78716c;
-  --text-inverse: #0c0a09;
+  --text-primary: #F1F5F9;
+  --text-secondary: #8FA0BD;
+  --text-tertiary: #64748B;
+  --text-inverse: #0A1020;
 
-  --accent: #38bdf8;
-  --accent-hover: #7dd3fc;
+  --accent: #0EA5F5;
+  --accent-hover: #38BDF8;
   --accent-active: #0284c7;
-  --accent-subdued: rgba(56, 189, 248, 0.12);
-  --accent-focus-ring: rgba(56, 189, 248, 0.3);
+  --accent-subdued: rgba(14, 165, 245, 0.15);
+  --accent-focus-ring: rgba(14, 165, 245, 0.3);
 
   /* Semantic - Priority Pills */
   --pill-prio-low-bg: #292524;

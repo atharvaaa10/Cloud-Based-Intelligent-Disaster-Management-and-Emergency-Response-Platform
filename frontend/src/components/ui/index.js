@@ -11,5 +11,6 @@ export { default as EmptyState } from './EmptyState';
 export { default as Skeleton, SkeletonTableRow, SkeletonStatCard } from './Skeleton';
 export { default as PageHeader } from './PageHeader';
 export { default as StatCard } from './StatCard';
+export { default as GlobalStatRow } from './GlobalStatRow';
 export { default as Spinner } from './Spinner';
 export { default as Timeline, formatRelativeTime, formatFullTime } from './Timeline';
