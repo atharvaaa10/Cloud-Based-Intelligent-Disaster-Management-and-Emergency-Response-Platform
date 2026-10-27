@@ -427,12 +427,22 @@ class AffectedZoneOut(BaseModel):
     description: str
 
 
+class PublicTeamMarker(BaseModel):
+    id: int
+    name: str
+    approx_latitude: Optional[float] = None
+    approx_longitude: Optional[float] = None
+    status: str
+
+
 class PublicMapResponse(BaseModel):
     incidents: List[PublicIncidentMarker]
     places: List[PlaceOut]
     affected_zones: List[AffectedZoneOut]
+    teams: List[PublicTeamMarker] = []
     total_public_incidents: int
     total_places: int
+    total_teams: int = 0
 
 
 # ── Global Operations Stat Cards (Citizen Header KPIs) ────────

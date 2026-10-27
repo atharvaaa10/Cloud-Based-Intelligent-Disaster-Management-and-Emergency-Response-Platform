@@ -347,219 +347,340 @@ export default function ReportIncident() {
 
   // ── Main form ─────────────────────────────────────────────────────────────────
   return (
-    <div className="main-content-narrow" style={{ margin:'0 auto' }}>
-      <div style={{ marginBottom:24 }}>
-        <h1 className="ui-page-title">Report emergency</h1>
-        <p className="ui-page-desc">Submit details below for automated triage and response team dispatch.</p>
+    <div className="emergency-form-layout">
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+        <div>
+          <h1 className="ui-page-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#EF4444', boxShadow: '0 0 10px #EF4444' }} />
+            <span>Report Emergency</span>
+          </h1>
+          <p className="ui-page-desc">Automated AI priority triage and immediate responder dispatch for Pune district.</p>
+        </div>
+
+        <div className="live-indicator-wrap" style={{ marginTop: 4 }}>
+          <span className="live-indicator-dot" />
+          <span>Dispatch System Active · 24/7</span>
+        </div>
       </div>
 
-      <Card padding="lg" className="emergency-form-card">
+      {/* Global error */}
+      {globalError && (
+        <div role="alert" style={{
+          display: 'flex', alignItems: 'flex-start', gap: 10,
+          padding: '12px 14px', backgroundColor: 'var(--danger-bg)',
+          color: 'var(--danger-text)', border: '1px solid var(--danger-border)',
+          borderRadius: 'var(--radius-md)', fontSize: 13,
+        }}>
+          <RefreshCw size={14} strokeWidth={2} style={{ flexShrink: 0, marginTop: 1 }} />
+          <span>{globalError}</span>
+        </div>
+      )}
 
-        {/* Global error */}
-        {globalError && (
-          <div role="alert" style={{
-            display:'flex', alignItems:'flex-start', gap:10,
-            padding:'12px 14px', backgroundColor:'var(--danger-bg)',
-            color:'var(--danger-text)', border:'1px solid var(--danger-border)',
-            borderRadius:'var(--radius-md)', marginBottom:20, fontSize:13,
-          }}>
-            <RefreshCw size={14} strokeWidth={2} style={{ flexShrink:0, marginTop:1 }} />
-            <span>{globalError}</span>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} noValidate>
-
-          {/* Category */}
-          <div className="ui-form-group">
-            <label className="ui-label" style={{ marginBottom:8 }}>
-              Type of emergency <span className="ui-required">*</span>
-            </label>
-            <div className="category-radio-grid">
-              {CATEGORIES.map(({ value, label, icon: Icon }) => {
-                const sel = form.category === value;
-                return (
-                  <button key={value} type="button" aria-pressed={sel}
-                    className={`category-radio-item ${sel ? 'is-selected' : ''}`}
-                    onClick={() => setForm((p) => ({ ...p, category: value }))}>
-                    <Icon size={18} strokeWidth={1.8} className="category-icon" />
-                    <span className="category-label">{label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Description */}
-          <Textarea label="What is happening?" id="desc" required rows={3}
-            placeholder="Describe the immediate situation, hazards, trapped persons, or water levels…"
-            value={form.description} onChange={set('description')}
-            hint="Provide enough detail for responders to prepare equipment."
-            error={fieldErrors.description} />
-
-          {/* Location */}
-          <Input label="Location or address" id="location" required
-            placeholder="e.g. Kothrud near Gandhi Bhavan, Pune"
-            value={form.location_text} onChange={set('location_text')}
-            hint="Landmarks, cross streets, or building names help response teams."
-            error={fieldErrors.location_text} />
-
-          {/* Coordinates + geolocation */}
-          <div className="ui-form-group">
-            <div style={{ display:'flex', alignItems:'center',
-              justifyContent:'space-between', marginBottom:8 }}>
-              <label className="ui-label" style={{ margin:0 }}>
-                GPS coordinates{' '}
-                <span style={{ color:'var(--text-tertiary)', fontWeight:400 }}>(optional)</span>
-              </label>
-              <button type="button" id="btn-use-location" onClick={handleUseLocation}
-                disabled={geoLoading} style={{
-                  display:'inline-flex', alignItems:'center', gap:5,
-                  fontSize:12, fontWeight:500,
-                  color: geoLoading ? 'var(--text-tertiary)' : 'var(--accent)',
-                  cursor: geoLoading ? 'not-allowed' : 'pointer',
-                  padding:'4px 8px', borderRadius:'var(--radius-sm)',
-                  border:'1px solid var(--border-default)', background:'var(--bg-surface)',
-                }}>
-                {geoLoading
-                  ? <><span className="ui-spinner" style={{ width:11, height:11 }} /> Locating…</>
-                  : <><LocateFixed size={12} strokeWidth={2} /> Use my location</>}
-              </button>
-            </div>
-
-            {geoError && (
-              <p style={{ display:'flex', gap:6, fontSize:12,
-                color:'var(--danger-text)', marginBottom:8 }}>
-                <MapPin size={12} strokeWidth={2} style={{ flexShrink:0, marginTop:1 }} />
-                {geoError}
+      <form onSubmit={handleSubmit} noValidate>
+        <div className="emergency-form-columns">
+          {/* ── Left Column Panel: Incident Classification & People Affected ── */}
+          <div className="emergency-panel-card">
+            <div>
+              <h2 style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 4px' }}>
+                Incident Classification
+              </h2>
+              <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: 0 }}>
+                Select category and describe the situation to equip rescuers properly.
               </p>
-            )}
-
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-              <Input label="Latitude" id="lat" type="number" step="any" placeholder="18.5074"
-                value={form.latitude} onChange={set('latitude')} error={fieldErrors.latitude} />
-              <Input label="Longitude" id="lng" type="number" step="any" placeholder="73.8077"
-                value={form.longitude} onChange={set('longitude')} error={fieldErrors.longitude} />
             </div>
-            <span className="ui-hint" style={{ marginTop:4, display:'block' }}>
-              Must be within Maharashtra (lat 15.6–22.1, lon 72.6–80.9).
-            </span>
-          </div>
 
-          {/* People affected */}
-          <div className="ui-form-group">
-            <label className="ui-label" htmlFor="people-stepper">
-              People affected or in danger <span className="ui-required">*</span>
-            </label>
-            <div className="stepper-control">
-              <button type="button" className="stepper-btn" onClick={decPeople}
-                aria-label="Decrease" disabled={+form.people_affected <= 1}>
-                <Minus size={16} strokeWidth={2} />
-              </button>
-              <input id="people-stepper" type="number" min="1" max="1000"
-                className="stepper-input" value={form.people_affected}
-                onChange={set('people_affected')} required />
-              <button type="button" className="stepper-btn" onClick={incPeople}
-                aria-label="Increase" disabled={+form.people_affected >= 1000}>
-                <Plus size={16} strokeWidth={2} />
-              </button>
-            </div>
-            {fieldErrors.people_affected && <FieldError msg={fieldErrors.people_affected} />}
-            <span className="ui-hint" style={{ marginTop:4 }}>1–1000 · used for triage priority scoring.</span>
-          </div>
-
-          {/* Photo upload with progress */}
-          <div className="ui-form-group">
-            <label className="ui-label">
-              Incident scene photo{' '}
-              <span style={{ color:'var(--text-tertiary)', fontWeight:400 }}>(optional, max 5 MB)</span>
-            </label>
-
-            {!photoPreview ? (
-              <div
-                className={`photo-dropzone ${isDragging ? 'is-dragging' : ''}`}
-                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                onDragLeave={() => setIsDragging(false)}
-                onDrop={(e) => { e.preventDefault(); setIsDragging(false); setFile(e.dataTransfer.files?.[0]); }}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <UploadCloud size={24} strokeWidth={1.5}
-                  style={{ color:'var(--text-tertiary)', marginBottom:6 }} />
-                <div style={{ fontSize:13, fontWeight:500 }}>Click to upload or drag photo here</div>
-                <div style={{ fontSize:11, color:'var(--text-secondary)', marginTop:2 }}>
-                  JPEG, PNG, or WebP · max 5 MB
-                </div>
-                <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp"
-                  onChange={(e) => setFile(e.target.files?.[0])} style={{ display:'none' }} />
+            {/* Category Selectable Icon Tiles */}
+            <div className="ui-form-group">
+              <label className="ui-label" style={{ marginBottom: 8 }}>
+                Type of emergency <span className="ui-required">*</span>
+              </label>
+              <div className="category-radio-grid">
+                {CATEGORIES.map(({ value, label, icon: Icon }) => {
+                  const sel = form.category === value;
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      aria-pressed={sel}
+                      data-cat={value}
+                      className={`category-radio-item ${sel ? 'is-selected' : ''}`}
+                      onClick={() => setForm((p) => ({ ...p, category: value }))}
+                    >
+                      <Icon size={20} strokeWidth={2} className="category-icon" />
+                      <span className="category-label">{label}</span>
+                    </button>
+                  );
+                })}
               </div>
-            ) : (
-              <div className="photo-preview-box" style={{ position:'relative' }}>
-                <img src={photoPreview} alt="Incident preview" className="photo-preview-img" />
+            </div>
 
-                {/* File info bar */}
-                <div style={{
-                  display:'flex', alignItems:'center', gap:8,
-                  padding:'8px 12px', background:'var(--bg-surface-subdued)',
-                  borderTop:'1px solid var(--border-default)', fontSize:12,
-                  color:'var(--text-secondary)',
-                }}>
-                  <Image size={13} strokeWidth={1.8} />
-                  <span style={{ flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                    {photoFile?.name}
-                  </span>
-                  <span>{fmt(photoFile?.size ?? 0)}</span>
-                </div>
-
-                {/* Upload progress bar */}
-                {uploadProgress !== null && (
-                  <div style={{ padding:'6px 12px 8px', background:'var(--bg-surface-subdued)',
-                    borderTop:'1px solid var(--border-default)' }}>
-                    <div style={{ display:'flex', justifyContent:'space-between',
-                      fontSize:11, color:'var(--text-secondary)', marginBottom:4 }}>
-                      <span>{uploadProgress < 100 ? 'Uploading…' : 'Upload complete ✓'}</span>
-                      <span>{uploadProgress}%</span>
-                    </div>
-                    <div style={{ height:4, borderRadius:2, background:'var(--border-default)', overflow:'hidden' }}>
-                      <div style={{
-                        height:'100%', borderRadius:2,
-                        background: uploadProgress === 100
-                          ? 'var(--pill-status-resolved-text)'
-                          : 'var(--accent)',
-                        width:`${uploadProgress}%`,
-                        transition:'width 0.2s ease',
-                      }} />
-                    </div>
-                  </div>
-                )}
-
-                <button type="button" className="photo-remove-btn" onClick={removePhoto}
-                  aria-label="Remove photo" title="Remove photo">
-                  <X size={14} strokeWidth={2} />
+            {/* People affected */}
+            <div className="ui-form-group">
+              <label className="ui-label" htmlFor="people-stepper">
+                People affected or in danger <span className="ui-required">*</span>
+              </label>
+              <div className="stepper-control">
+                <button
+                  type="button"
+                  className="stepper-btn"
+                  onClick={decPeople}
+                  aria-label="Decrease"
+                  disabled={+form.people_affected <= 1}
+                >
+                  <Minus size={16} strokeWidth={2} />
+                </button>
+                <input
+                  id="people-stepper"
+                  type="number"
+                  min="1"
+                  max="1000"
+                  className="stepper-input"
+                  value={form.people_affected}
+                  onChange={set('people_affected')}
+                  required
+                />
+                <button
+                  type="button"
+                  className="stepper-btn"
+                  onClick={incPeople}
+                  aria-label="Increase"
+                  disabled={+form.people_affected >= 1000}
+                >
+                  <Plus size={16} strokeWidth={2} />
                 </button>
               </div>
-            )}
+              {fieldErrors.people_affected && <FieldError msg={fieldErrors.people_affected} />}
+              <span className="ui-hint" style={{ marginTop: 4 }}>Used by triage algorithm for immediate priority classification.</span>
+            </div>
 
-            {photoError && <FieldError msg={photoError} />}
+            {/* Description */}
+            <Textarea
+              label="Incident details & immediate danger"
+              id="desc"
+              required
+              rows={4}
+              placeholder="Describe what is happening, trapped persons, water rising, power outage, or medical conditions…"
+              value={form.description}
+              onChange={set('description')}
+              hint="Provide enough detail for rescue teams to bring correct boats, stretchers, or gear."
+              error={fieldErrors.description}
+            />
           </div>
 
-          {/* Submit */}
-          <Button type="submit" id="btn-submit-report" variant="primary" size="lg"
-            loading={loading} disabled={loading}
-            style={{ width:'100%', minHeight:48, marginTop:12 }}>
-            {loading
-              ? (uploadStatus || 'Submitting report…')
-              : globalError
-                ? 'Retry submission'
-                : 'Submit emergency report'}
-          </Button>
+          {/* ── Right Column Panel: Location, Mini Preview & Scene Photo ── */}
+          <div className="emergency-panel-card">
+            <div>
+              <h2 style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 4px' }}>
+                Location & Scene Evidence
+              </h2>
+              <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: 0 }}>
+                Pinpoint accurate coordinates and attach a scene photo if safe to do so.
+              </p>
+            </div>
 
-          {globalError && (
-            <p style={{ textAlign:'center', fontSize:12, color:'var(--text-tertiary)', marginTop:8 }}>
-              Your typed data has been preserved — click <strong>Retry submission</strong> to try again.
-            </p>
-          )}
-        </form>
-      </Card>
+            {/* Location Address */}
+            <Input
+              label="Address or nearby landmark"
+              id="location"
+              required
+              placeholder="e.g. Near Alka Talkies Bridge, Sadashiv Peth, Pune"
+              value={form.location_text}
+              onChange={set('location_text')}
+              hint="Landmarks, cross streets, or colony names aid field navigation."
+              error={fieldErrors.location_text}
+            />
+
+            {/* Coordinates + geolocation */}
+            <div className="ui-form-group">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <label className="ui-label" style={{ margin: 0 }}>
+                  GPS Coordinates{' '}
+                  <span style={{ color: 'var(--text-tertiary)', fontWeight: 400 }}>(optional)</span>
+                </label>
+                <button
+                  type="button"
+                  id="btn-use-location"
+                  onClick={handleUseLocation}
+                  disabled={geoLoading}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 5,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: geoLoading ? 'var(--text-tertiary)' : 'var(--accent)',
+                    cursor: geoLoading ? 'not-allowed' : 'pointer',
+                    padding: '4px 10px',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--border-default)',
+                    background: 'var(--bg-surface-subdued)',
+                  }}
+                >
+                  {geoLoading ? (
+                    <><span className="ui-spinner" style={{ width: 11, height: 11 }} /> Locating…</>
+                  ) : (
+                    <><LocateFixed size={12} strokeWidth={2} /> Use my current location</>
+                  )}
+                </button>
+              </div>
+
+              {geoError && (
+                <p style={{ display: 'flex', gap: 6, fontSize: 12, color: 'var(--danger-text)', marginBottom: 8 }}>
+                  <MapPin size={12} strokeWidth={2} style={{ flexShrink: 0, marginTop: 1 }} />
+                  {geoError}
+                </p>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <Input
+                  label="Latitude"
+                  id="lat"
+                  type="number"
+                  step="any"
+                  placeholder="18.5204"
+                  value={form.latitude}
+                  onChange={set('latitude')}
+                  error={fieldErrors.latitude}
+                />
+                <Input
+                  label="Longitude"
+                  id="lng"
+                  type="number"
+                  step="any"
+                  placeholder="73.8567"
+                  value={form.longitude}
+                  onChange={set('longitude')}
+                  error={fieldErrors.longitude}
+                />
+              </div>
+
+              {/* Small preview map container */}
+              <div className="location-mini-preview" title="Location coordinate preview">
+                {form.latitude && form.longitude ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, color: 'var(--accent)' }}>
+                    <MapPin size={22} strokeWidth={2.2} style={{ filter: 'drop-shadow(0 0 6px rgba(14, 165, 245, 0.6))' }} />
+                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-primary)' }}>
+                      Coordinates Set ({form.latitude}, {form.longitude})
+                    </span>
+                    <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>Pune District Command Grid</span>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, color: 'var(--text-tertiary)' }}>
+                    <MapPin size={20} strokeWidth={1.5} />
+                    <span style={{ fontSize: 11 }}>No GPS coordinates set yet</span>
+                    <span style={{ fontSize: 10 }}>Click &ldquo;Use my current location&rdquo; or enter above</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Photo upload with preview and progress */}
+            <div className="ui-form-group">
+              <label className="ui-label">
+                Scene Photo{' '}
+                <span style={{ color: 'var(--text-tertiary)', fontWeight: 400 }}>(optional, max 5 MB)</span>
+              </label>
+
+              {!photoPreview ? (
+                <div
+                  className={`photo-dropzone ${isDragging ? 'is-dragging' : ''}`}
+                  onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                  onDragLeave={() => setIsDragging(false)}
+                  onDrop={(e) => { e.preventDefault(); setIsDragging(false); setFile(e.dataTransfer.files?.[0]); }}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <UploadCloud size={24} strokeWidth={1.5} style={{ color: 'var(--text-tertiary)', marginBottom: 6 }} />
+                  <div style={{ fontSize: 13, fontWeight: 500 }}>Click to upload or drag photo here</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>
+                    JPEG, PNG, or WebP · max 5 MB
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={(e) => setFile(e.target.files?.[0])}
+                    style={{ display: 'none' }}
+                  />
+                </div>
+              ) : (
+                <div className="photo-preview-box">
+                  <img src={photoPreview} alt="Incident scene preview" className="photo-preview-img" />
+
+                  {/* File info bar */}
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    padding: '8px 12px', background: 'var(--bg-surface-subdued)',
+                    borderTop: '1px solid var(--border-default)', fontSize: 12,
+                    color: 'var(--text-secondary)',
+                  }}>
+                    <Image size={13} strokeWidth={1.8} />
+                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {photoFile?.name}
+                    </span>
+                    <span>{fmt(photoFile?.size ?? 0)}</span>
+                  </div>
+
+                  {/* Upload progress bar */}
+                  {uploadProgress !== null && (
+                    <div style={{ padding: '6px 12px 8px', background: 'var(--bg-surface-subdued)', borderTop: '1px solid var(--border-default)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-secondary)', marginBottom: 4 }}>
+                        <span>{uploadProgress < 100 ? 'Uploading…' : 'Upload complete ✓'}</span>
+                        <span>{uploadProgress}%</span>
+                      </div>
+                      <div style={{ height: 4, borderRadius: 2, background: 'var(--border-default)', overflow: 'hidden' }}>
+                        <div style={{
+                          height: '100%', borderRadius: 2,
+                          background: uploadProgress === 100 ? 'var(--pill-status-resolved-text)' : 'var(--accent)',
+                          width: `${uploadProgress}%`,
+                          transition: 'width 0.2s ease',
+                        }} />
+                      </div>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    className="photo-remove-btn"
+                    onClick={removePhoto}
+                    aria-label="Remove photo"
+                    title="Remove photo"
+                  >
+                    <X size={14} strokeWidth={2} />
+                  </button>
+                </div>
+              )}
+
+              {photoError && <FieldError msg={photoError} />}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Sticky Submit Bar at Bottom ── */}
+        <div className="sticky-submit-bar" style={{ marginTop: 24, borderRadius: 'var(--radius-lg)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-secondary)' }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#EF4444', animation: 'pulse-live 1.8s infinite' }} />
+            <span>Emergency reports are reviewed by live dispatchers immediately upon submission.</span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <Button
+              type="submit"
+              id="btn-submit-report"
+              variant="danger"
+              size="lg"
+              loading={loading}
+              disabled={loading}
+              style={{ minHeight: 44, padding: '0 28px', fontWeight: 600, boxShadow: '0 0 16px rgba(239, 68, 68, 0.4)' }}
+            >
+              {loading
+                ? (uploadStatus || 'Submitting report…')
+                : globalError
+                  ? 'Retry submission'
+                  : 'Submit Emergency Report'}
+            </Button>
+          </div>
+        </div>
+      </form>
     </div>
   );
 }

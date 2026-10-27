@@ -203,4 +203,4 @@ async def test_citizen_global_stats_kpis(client: AsyncClient, setup_db):
     data_with_loc = resp_with_loc.json()
     assert data_with_loc["nearby_shelters_count"] is not None
     assert isinstance(data_with_loc["nearby_shelters_count"], int)
-
+    

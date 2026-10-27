@@ -11,20 +11,17 @@ import {
   AlertTriangle,
   ClipboardList,
   LogOut,
-  Sun,
-  Moon,
   Menu,
   X,
   LifeBuoy,
   Bell,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
 import { useBellCount } from '../hooks/useBellCount';
+import ErrorBoundary from './ui/ErrorBoundary';
 
 export default function AppLayout() {
   const { user, logout } = useAuth();
-  const { theme, toggleTheme } = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
   const { count: bellCount } = useBellCount();
@@ -146,16 +143,6 @@ export default function AppLayout() {
 
             {/* Right: Theme Toggle, User Avatar Circle + Name/Role, Outlined Sign Out */}
             <div className="citizen-header-right">
-              <button
-                type="button"
-                className="citizen-theme-btn"
-                onClick={toggleTheme}
-                title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-                aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-              >
-                {theme === 'dark' ? <Sun size={15} strokeWidth={1.9} /> : <Moon size={15} strokeWidth={1.9} />}
-              </button>
-
               <div className="citizen-user-profile">
                 <div className="citizen-avatar-circle" aria-hidden="true">
                   {initials}
@@ -253,7 +240,9 @@ export default function AppLayout() {
 
 
         <main className="main-content">
-          <Outlet />
+          <ErrorBoundary>
+            <Outlet />
+          </ErrorBoundary>
         </main>
       </div>
     );
@@ -379,20 +368,13 @@ export default function AppLayout() {
           </div>
 
           <div className="topbar-right">
-            <button
-              type="button"
-              className="theme-toggle-btn"
-              onClick={toggleTheme}
-              title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-              aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-            >
-              {theme === 'dark' ? <Sun size={15} strokeWidth={1.8} /> : <Moon size={15} strokeWidth={1.8} />}
-            </button>
           </div>
         </header>
 
         <main className="main-content">
-          <Outlet />
+          <ErrorBoundary>
+            <Outlet />
+          </ErrorBoundary>
         </main>
       </div>
     </div>

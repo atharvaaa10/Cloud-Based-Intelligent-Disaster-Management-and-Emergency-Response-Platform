@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Building2, Heart, Package, Phone, MapPin, Navigation2, Search,
   LocateFixed, AlertCircle, RefreshCw, ChevronRight, Wifi, WifiOff,
@@ -57,40 +57,87 @@ function ResourceCard({ place, userLocation }) {
   const Icon = meta.icon;
   const dist = userLocation && place.latitude && place.longitude
     ? haversine(userLocation.lat, userLocation.lon, place.latitude, place.longitude) : null;
-  const mapsUrl = `https://www.openstreetmap.org/?mlat=${place.latitude}&mlon=${place.longitude}&zoom=16`;
   const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${place.latitude},${place.longitude}`;
+
+  // Availability state
+  const availStatus = place.available ? (place.capacity && place.capacity > 0 ? "available" : "limited") : "full";
+  const availLabel = place.available ? (availStatus === "limited" ? "Limited" : "Available") : "Full / Closed";
+  const pillClass = availStatus === "available" ? "availability-pill-available" : availStatus === "limited" ? "availability-pill-limited" : "availability-pill-full";
+
+  // Capacity estimate bar
+  const capacityPct = place.available ? (availStatus === "limited" ? 85 : 45) : 100;
+
   return (
-    <div className={`resource-card ${place.available ? "available" : "unavailable"}`}>
+    <div className={`resource-card ${place.available ? "available" : "unavailable"}`} id={`resource-card-${place.id}`}>
       <div className="rc-header">
-        <div className="rc-icon-wrap" style={{background: meta.bg}}>
-          <Icon size={18} color={meta.color} strokeWidth={1.8} />
+        <div className="rc-icon-wrap" style={{ background: meta.bg }}>
+          <Icon size={18} color={meta.color} strokeWidth={2} />
         </div>
         <div className="rc-title-block">
           <h3 className="rc-name">{place.name}</h3>
-          <span className="rc-type-badge" style={{color: meta.color, background: meta.bg}}>{meta.label}</span>
+          <span className="rc-type-badge" style={{ color: meta.color, background: meta.bg }}>{meta.label}</span>
         </div>
-        <div className={`avail-badge ${place.available ? "avail-open" : "avail-closed"}`}>
-          {place.available ? <><Wifi size={10} strokeWidth={2} /> Available</> : <><WifiOff size={10} strokeWidth={2} /> Unavailable</>}
-        </div>
+        <span className={`availability-pill ${pillClass}`}>
+          <span className="availability-dot" />
+          <span>{availLabel}</span>
+        </span>
       </div>
-      <p className="rc-address"><MapPin size={12} strokeWidth={2} style={{flexShrink:0}} /><span>{place.address}</span></p>
-      {place.type === "shelter" && place.capacity > 0 && (
-        <div className="rc-capacity"><Users size={12} strokeWidth={2} /><span>Capacity: <strong>{place.capacity.toLocaleString()}</strong> people</span></div>
+
+      <p className="rc-address">
+        <MapPin size={12} strokeWidth={2} style={{ flexShrink: 0, marginTop: 2, color: 'var(--text-tertiary)' }} />
+        <span>{place.address}</span>
+      </p>
+
+      {/* Capacity & meter bar */}
+      {place.capacity > 0 && (
+        <div style={{ marginTop: 2, marginBottom: 4 }}>
+          <div className="rc-capacity" style={{ justifyContent: 'space-between', marginBottom: 4 }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+              <Users size={12} strokeWidth={2} />
+              <span>Capacity: <strong>{place.capacity.toLocaleString()}</strong> persons</span>
+            </span>
+            <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{capacityPct}% occupied</span>
+          </div>
+          <div style={{ height: 4, width: '100%', borderRadius: 2, background: 'var(--border-default)', overflow: 'hidden' }}>
+            <div style={{
+              height: '100%',
+              width: `${capacityPct}%`,
+              background: capacityPct > 80 ? '#EF4444' : capacityPct > 50 ? '#F59E0B' : '#10B981',
+              borderRadius: 2,
+              transition: 'width 200ms ease',
+            }} />
+          </div>
+        </div>
       )}
+
       {dist != null && (
-        <div className="rc-distance"><Navigation2 size={11} strokeWidth={2} /><span>{formatDist(dist)} away</span></div>
+        <div className="rc-distance">
+          <Navigation2 size={11} strokeWidth={2} />
+          <span>{formatDist(dist)} away</span>
+        </div>
       )}
+
       <div className="rc-actions">
         {place.contact && (
-          <a href={`tel:${place.contact.replace(/\s+/g,"")}`} className="rc-btn rc-btn-call" title={`Call ${place.name}`}>
-            <Phone size={12} strokeWidth={2} /><span>{place.contact}</span>
+          <a
+            href={`tel:${place.contact.replace(/\s+/g,"")}`}
+            className="rc-btn rc-btn-call"
+            title={`Call ${place.name}`}
+            id={`btn-call-resource-${place.id}`}
+          >
+            <Phone size={12} strokeWidth={2} />
+            <span>Call</span>
           </a>
         )}
-        <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="rc-btn rc-btn-map">
-          <MapPin size={12} strokeWidth={2} /><span>Show on map</span>
-        </a>
-        <a href={directionsUrl} target="_blank" rel="noopener noreferrer" className="rc-btn rc-btn-dir">
-          <Navigation2 size={12} strokeWidth={2} /><span>Directions</span>
+        <a
+          href={directionsUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="rc-btn rc-btn-dir"
+          id={`btn-dir-resource-${place.id}`}
+        >
+          <Navigation2 size={12} strokeWidth={2} />
+          <span>Directions</span>
         </a>
       </div>
     </div>

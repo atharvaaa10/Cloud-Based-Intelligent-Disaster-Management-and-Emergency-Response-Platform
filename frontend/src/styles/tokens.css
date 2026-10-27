@@ -2,10 +2,60 @@
 
 /* ═══════════════════════════════════════════════════════════════════
    Design Tokens — Disaster Management & Emergency Response Platform
-   Linear / Vercel Internal Operations Tool Aesthetic
+   Locked Single Dark Theme — #0C1117 Page Background
    ═══════════════════════════════════════════════════════════════════ */
 
 :root {
+  /* Enforce dark color-scheme */
+  color-scheme: dark;
+
+  /* ── Core Dark Theme Variables ────────────────────────────────── */
+  --bg: #0C1117;
+  --nav: #101419;
+  --panel: #13191E;
+  --card: #1B2228;
+  --input: #171D22;
+  --border: #303A42;
+  --primary: #01AEFD;
+  --primary-hover: #22C7FF;
+  --text: #F4F7FA;
+  --text-secondary: #A7B0BA;
+  --text-muted: #77828D;
+
+  /* ── Backward-compatible Aliases for Core Tokens ───────────────── */
+  --bg-canvas: var(--bg);
+  --bg-surface: var(--panel);
+  --bg-surface-subdued: #10151A;
+  --bg-surface-hover: #1E262E;
+  --bg-surface-active: #222C35;
+  --bg-card: var(--card);
+  --bg-elevated: var(--panel);
+  --bg-input: var(--input);
+  --bg-hover: #1E262E;
+
+  --border-subtle: #20272F;
+  --border-default: var(--border);
+  --border-hover: #414D57;
+  --border-focus: var(--primary);
+  --border-primary: var(--border);
+  --border-accent: var(--primary);
+
+  --text-primary: var(--text);
+  --text-tertiary: var(--text-muted);
+  --text-inverse: #0C1117;
+
+  --accent: var(--primary);
+  --accent-hover: var(--primary-hover);
+  --accent-active: #018ECC;
+  --accent-subdued: rgba(1, 174, 253, 0.15);
+  --accent-focus-ring: rgba(1, 174, 253, 0.35);
+  --accent-primary: var(--primary);
+  --primary-accent: var(--primary);
+  --primary-accent-hover: var(--primary-hover);
+
+  --nav-active-bg: rgba(1, 174, 253, 0.15);
+  --nav-active-text: var(--primary);
+
   /* ── Typography ──────────────────────────────────────────────── */
   --font-sans: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
@@ -38,267 +88,102 @@
   --radius-sm: 4px;
   --radius-md: 6px;
   --radius-lg: 8px;
+  --radius-xl: 12px;
   --radius-full: 9999px;
 
   --transition-fast: 120ms cubic-bezier(0.16, 1, 0.3, 1);
   --transition-normal: 150ms cubic-bezier(0.16, 1, 0.3, 1);
-  /* -- Radius XL (citizen page cards) -- */
-  --radius-xl: 12px;
 
-  /* ── Reference Design System Tokens (DisasterResponse Ops Portal) ── */
-  --primary-accent: #0EA5F5;
-  --nav-active-bg: #10345C;
-  --nav-active-text: #38BDF8;
+  /* ── Category / Priority Colors ──────────────────────────────── */
+  --color-critical: #F04438;
+  --color-high: #F59E0B;
+  --color-medium: #FACC15;
+  --color-low: #34D399;
+  --color-medical: #00BFFF;
+  --color-shelter: #22C55E;
+  --color-team: #0EA5FF;
+  --color-supplies: #A855F7;
 
-  /* Stat Card Tints (Dark Ops Reference) */
-  --tint-red-bg: #2A1218;
-  --tint-red-border: #4D1A23;
-  --tint-red-icon-bg: rgba(239, 68, 68, 0.2);
-  --tint-red-icon: #EF4444;
+  --status-critical: #F04438;
+  --status-resolved: #10B981;
 
-  --tint-amber-bg: #2A200E;
-  --tint-amber-border: #4D3814;
+  /* Stat Card Tints (Dark Ops: 10-15% tint with matching 1px border) */
+  --tint-red-bg: rgba(240, 68, 56, 0.12);
+  --tint-red-border: rgba(240, 68, 56, 0.28);
+  --tint-red-icon-bg: rgba(240, 68, 56, 0.2);
+  --tint-red-icon: #F04438;
+
+  --tint-amber-bg: rgba(245, 158, 11, 0.12);
+  --tint-amber-border: rgba(245, 158, 11, 0.28);
   --tint-amber-icon-bg: rgba(245, 158, 11, 0.2);
   --tint-amber-icon: #F59E0B;
 
-  --tint-green-bg: #0E2A22;
-  --tint-green-border: #154D3C;
+  --tint-green-bg: rgba(34, 197, 94, 0.12);
+  --tint-green-border: rgba(34, 197, 94, 0.28);
   --tint-green-icon-bg: rgba(34, 197, 94, 0.2);
   --tint-green-icon: #22C55E;
 
-  --tint-blue-bg: #0E2240;
-  --tint-blue-border: #183C6E;
-  --tint-blue-icon-bg: rgba(14, 165, 245, 0.2);
-  --tint-blue-icon: #0EA5F5;
+  --tint-blue-bg: rgba(1, 174, 253, 0.12);
+  --tint-blue-border: rgba(1, 174, 253, 0.28);
+  --tint-blue-icon-bg: rgba(1, 174, 253, 0.2);
+  --tint-blue-icon: #01AEFD;
 
-  --tint-purple-bg: #1E1840;
-  --tint-purple-border: #352B6E;
-  --tint-purple-icon-bg: rgba(139, 92, 246, 0.2);
-  --tint-purple-icon: #8B5CF6;
-
-  /* -- Alias tokens for citizen portal pages -- */
-  --bg-elevated: #ffffff;
-  --bg-hover: #f5f5f4;
-  --border-primary: #e7e5e4;
-  --border-accent: #0284c7;
-  --text-muted: #a8a29e;
-  --accent-primary: #0284c7;
-  --status-critical: #dc2626;
-  --status-resolved: #059669;
-
-  /* ── Light Theme (Default) ───────────────────────────────────── */
-  --bg-canvas: #fafaf9;
-  --bg-surface: #ffffff;
-  --bg-surface-subdued: #f5f5f4;
-  --bg-surface-hover: #f5f5f4;
-  --bg-surface-active: #e7e5e4;
-
-  --border-subtle: #f5f5f4;
-  --border-default: #e7e5e4;
-  --border-hover: #d6d3d1;
-  --border-focus: #0284c7;
-
-  --text-primary: #1c1917;
-  --text-secondary: #78716c;
-  --text-tertiary: #a8a29e;
-  --text-inverse: #ffffff;
-
-  /* Accent: Deep Calm Operations Blue */
-  --accent: #0284c7;
-  --accent-hover: #0369a1;
-  --accent-active: #075985;
-  --accent-subdued: #e0f2fe;
-  --accent-focus-ring: rgba(2, 132, 199, 0.25);
+  --tint-purple-bg: rgba(168, 85, 247, 0.12);
+  --tint-purple-border: rgba(168, 85, 247, 0.28);
+  --tint-purple-icon-bg: rgba(168, 85, 247, 0.2);
+  --tint-purple-icon: #A855F7;
 
   /* Semantic - Priority Pills */
-  --pill-prio-low-bg: #f5f5f4;
-  --pill-prio-low-text: #57534e;
-  --pill-prio-low-border: #e7e5e4;
+  --pill-prio-low-bg: #222A30;
+  --pill-prio-low-text: #D6DCE2;
+  --pill-prio-low-border: #3A454F;
 
-  --pill-prio-medium-bg: #fef3c7;
-  --pill-prio-medium-text: #92400e;
-  --pill-prio-medium-border: #fde68a;
+  --pill-prio-medium-bg: rgba(245, 158, 11, 0.15);
+  --pill-prio-medium-text: #FCD34D;
+  --pill-prio-medium-border: rgba(245, 158, 11, 0.35);
 
-  --pill-prio-high-bg: #ffedd5;
-  --pill-prio-high-text: #9a3412;
-  --pill-prio-high-border: #fed7aa;
+  --pill-prio-high-bg: rgba(249, 115, 22, 0.15);
+  --pill-prio-high-text: #FDBA74;
+  --pill-prio-high-border: rgba(249, 115, 22, 0.35);
 
-  --pill-prio-critical-bg: #fee2e2;
-  --pill-prio-critical-text: #991b1b;
-  --pill-prio-critical-border: #fecaca;
+  --pill-prio-critical-bg: rgba(239, 68, 68, 0.18);
+  --pill-prio-critical-text: #FCA5A5;
+  --pill-prio-critical-border: rgba(239, 68, 68, 0.4);
 
   /* Semantic - Status Pills */
-  --pill-status-reported-bg: #f1f5f9;
-  --pill-status-reported-text: #334155;
-  --pill-status-reported-border: #cbd5e1;
+  --pill-status-reported-bg: rgba(119, 130, 141, 0.18);
+  --pill-status-reported-text: #CBD5E1;
+  --pill-status-reported-border: rgba(119, 130, 141, 0.35);
 
-  --pill-status-assigned-bg: #e0f2fe;
-  --pill-status-assigned-text: #075985;
-  --pill-status-assigned-border: #bae6fd;
+  --pill-status-assigned-bg: rgba(1, 174, 253, 0.16);
+  --pill-status-assigned-text: #7DD3FC;
+  --pill-status-assigned-border: rgba(1, 174, 253, 0.35);
 
-  --pill-status-in_progress-bg: #fef3c7;
-  --pill-status-in_progress-text: #92400e;
-  --pill-status-in_progress-border: #fde68a;
+  --pill-status-in_progress-bg: rgba(245, 158, 11, 0.15);
+  --pill-status-in_progress-text: #FCD34D;
+  --pill-status-in_progress-border: rgba(245, 158, 11, 0.35);
 
-  --pill-status-resolved-bg: #ecfdf5;
-  --pill-status-resolved-text: #065f46;
-  --pill-status-resolved-border: #a7f3d0;
+  --pill-status-resolved-bg: rgba(16, 185, 129, 0.16);
+  --pill-status-resolved-text: #6EE7B7;
+  --pill-status-resolved-border: rgba(16, 185, 129, 0.35);
 
   /* Semantic - Danger Actions */
-  --danger-bg: #fee2e2;
-  --danger-text: #991b1b;
-  --danger-border: #fecaca;
-  --danger-solid: #dc2626;
-  --danger-solid-hover: #b91c1c;
+  --danger-bg: rgba(239, 68, 68, 0.15);
+  --danger-text: #FCA5A5;
+  --danger-border: rgba(239, 68, 68, 0.35);
+  --danger-solid: #EF4444;
+  --danger-solid-hover: #DC2626;
 
-  /* Subtle shadow for elevated modals only */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
-  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.12);
+  /* Shadows for subtle elevation */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6);
 
   /* Layout dimensions */
   --sidebar-width: 240px;
   --topbar-height: 52px;
   --content-max-width: 1200px;
   --form-max-width: 560px;
-}
-
-/* ── Dark Theme (data-theme="dark") ───────────────────────────── */
-[data-theme="dark"] {
-  --bg-canvas: #0A1020;
-  --bg-surface: #0F1830;
-  --bg-surface-subdued: #142041;
-  --bg-surface-hover: #162447;
-  --bg-surface-active: #1D2E5C;
-
-  --border-subtle: #142041;
-  --border-default: #1F2D4D;
-  --border-hover: #2E426D;
-  --border-focus: #0EA5F5;
-
-  --text-primary: #F1F5F9;
-  --text-secondary: #8FA0BD;
-  --text-tertiary: #64748B;
-  --text-inverse: #0A1020;
-
-  --accent: #0EA5F5;
-  --accent-hover: #38BDF8;
-  --accent-active: #0284c7;
-  --accent-subdued: rgba(14, 165, 245, 0.15);
-  --accent-focus-ring: rgba(14, 165, 245, 0.3);
-
-  /* Semantic - Priority Pills */
-  --pill-prio-low-bg: #292524;
-  --pill-prio-low-text: #d6d3d1;
-  --pill-prio-low-border: #44403c;
-
-  --pill-prio-medium-bg: rgba(245, 158, 11, 0.15);
-  --pill-prio-medium-text: #fcd34d;
-  --pill-prio-medium-border: rgba(245, 158, 11, 0.35);
-
-  --pill-prio-high-bg: rgba(249, 115, 22, 0.15);
-  --pill-prio-high-text: #fdba74;
-  --pill-prio-high-border: rgba(249, 115, 22, 0.35);
-
-  --pill-prio-critical-bg: rgba(239, 68, 68, 0.18);
-  --pill-prio-critical-text: #fca5a5;
-  --pill-prio-critical-border: rgba(239, 68, 68, 0.4);
-
-  /* Semantic - Status Pills */
-  --pill-status-reported-bg: rgba(100, 116, 139, 0.18);
-  --pill-status-reported-text: #cbd5e1;
-  --pill-status-reported-border: rgba(100, 116, 139, 0.35);
-
-  --pill-status-assigned-bg: rgba(14, 165, 233, 0.16);
-  --pill-status-assigned-text: #7dd3fc;
-  --pill-status-assigned-border: rgba(14, 165, 233, 0.35);
-
-  --pill-status-in_progress-bg: rgba(245, 158, 11, 0.15);
-  --pill-status-in_progress-text: #fcd34d;
-  --pill-status-in_progress-border: rgba(245, 158, 11, 0.35);
-
-  --pill-status-resolved-bg: rgba(16, 185, 129, 0.16);
-  --pill-status-resolved-text: #6ee7b7;
-  --pill-status-resolved-border: rgba(16, 185, 129, 0.35);
-
-  --danger-bg: rgba(239, 68, 68, 0.15);
-  --danger-text: #fca5a5;
-  --danger-border: rgba(239, 68, 68, 0.35);
-  --danger-solid: #ef4444;
-  --danger-solid-hover: #dc2626;
-
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6);
-}
-
-/* Fallback automatic dark theme if no explicit data-theme is set */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg-canvas: #0c0a09;
-    --bg-surface: #1c1917;
-    --bg-surface-subdued: #292524;
-    --bg-surface-hover: #292524;
-    --bg-surface-active: #44403c;
-
-    --border-subtle: #292524;
-    --border-default: #44403c;
-    --border-hover: #57534e;
-    --border-focus: #38bdf8;
-
-    --text-primary: #fafaf9;
-    --text-secondary: #a8a29e;
-    --text-tertiary: #78716c;
-    --text-inverse: #0c0a09;
-
-    --accent: #38bdf8;
-    --accent-hover: #7dd3fc;
-    --accent-active: #0284c7;
-    --accent-subdued: rgba(56, 189, 248, 0.12);
-    --accent-focus-ring: rgba(56, 189, 248, 0.3);
-
-    --pill-prio-low-bg: #292524;
-    --pill-prio-low-text: #d6d3d1;
-    --pill-prio-low-border: #44403c;
-
-    --pill-prio-medium-bg: rgba(245, 158, 11, 0.15);
-    --pill-prio-medium-text: #fcd34d;
-    --pill-prio-medium-border: rgba(245, 158, 11, 0.35);
-
-    --pill-prio-high-bg: rgba(249, 115, 22, 0.15);
-    --pill-prio-high-text: #fdba74;
-    --pill-prio-high-border: rgba(249, 115, 22, 0.35);
-
-    --pill-prio-critical-bg: rgba(239, 68, 68, 0.18);
-    --pill-prio-critical-text: #fca5a5;
-    --pill-prio-critical-border: rgba(239, 68, 68, 0.4);
-
-    --pill-status-reported-bg: rgba(100, 116, 139, 0.18);
-    --pill-status-reported-text: #cbd5e1;
-    --pill-status-reported-border: rgba(100, 116, 139, 0.35);
-
-    --pill-status-assigned-bg: rgba(14, 165, 233, 0.16);
-    --pill-status-assigned-text: #7dd3fc;
-    --pill-status-assigned-border: rgba(14, 165, 233, 0.35);
-
-    --pill-status-in_progress-bg: rgba(245, 158, 11, 0.15);
-    --pill-status-in_progress-text: #fcd34d;
-    --pill-status-in_progress-border: rgba(245, 158, 11, 0.35);
-
-    --pill-status-resolved-bg: rgba(16, 185, 129, 0.16);
-    --pill-status-resolved-text: #6ee7b7;
-    --pill-status-resolved-border: rgba(16, 185, 129, 0.35);
-
-    --danger-bg: rgba(239, 68, 68, 0.15);
-    --danger-text: #fca5a5;
-    --danger-border: rgba(239, 68, 68, 0.35);
-    --danger-solid: #ef4444;
-    --danger-solid-hover: #dc2626;
-
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
-    --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6);
-  }
 }
 
 /* ── Motion Accessibility ─────────────────────────────────────── */

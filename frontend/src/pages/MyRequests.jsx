@@ -388,6 +388,39 @@ export default function MyRequests() {
             </Button>
           )}
         </div>
+
+        {/* ── Quick Filter Chips ── */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--border-default)', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            Quick Status:
+          </span>
+          {STATUSES.map(({ value, label }) => {
+            const isSel = statusFilter === value;
+            return (
+              <button
+                key={value || 'all'}
+                type="button"
+                onClick={() => {
+                  setStatusFilter(value);
+                  setPage(1);
+                }}
+                style={{
+                  padding: '3px 10px',
+                  borderRadius: 'var(--radius-full)',
+                  fontSize: 11,
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  border: isSel ? '1px solid var(--accent)' : '1px solid var(--border-default)',
+                  background: isSel ? 'var(--accent-subdued)' : 'transparent',
+                  color: isSel ? 'var(--accent)' : 'var(--text-secondary)',
+                  transition: 'all var(--transition-fast)',
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
       </Card>
 
       {/* ── Error State ──────────────────────────────────────────────────────── */}

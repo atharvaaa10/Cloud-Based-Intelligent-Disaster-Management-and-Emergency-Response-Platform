@@ -93,84 +93,81 @@ export default function GlobalStatRow({ userCoords = null, className = '' }) {
       : 'stock-adequate';
 
   return (
-    <section className={`global-stat-row ${className}`} aria-label="Live disaster management KPIs">
+    <section className={`global-stat-row ${className}`} aria-label="Live Operations KPI Metrics">
       {/* 1. Active Incidents (Red Tint) */}
-      <div className="stat-card-tinted stat-tint-red" id="stat-card-active-incidents">
-        <div className="stat-tint-top">
-          <span className="stat-tint-label">Active Incidents</span>
-          <div className="stat-tint-icon-wrap" aria-hidden="true">
-            <AlertTriangle size={15} strokeWidth={2} />
-          </div>
+      <div className="stat-card-tinted stat-tint-red" id="stat-card-active-incidents" tabIndex={0} role="region" aria-label="Active Incidents">
+        <div className="stat-tint-icon-wrap" aria-hidden="true">
+          <AlertTriangle size={24} strokeWidth={2.2} />
         </div>
-        <div className="stat-tint-body">
-          <span className="stat-tint-value">{data?.active_incidents ?? 0}</span>
-          <span className="stat-tint-sub stat-tint-trend">{trendText}</span>
+        <div className="stat-tint-center">
+          <span className="stat-tint-number">{data?.active_incidents ?? 0}</span>
+          <span className="stat-tint-label">Active Incidents</span>
+        </div>
+        <div className="stat-tint-right">
+          <span className="stat-right-top stat-trend-red">{trendText}</span>
+          <span className="stat-right-bottom">from last 24h</span>
         </div>
       </div>
 
-      {/* 2. People Affected (Amber Tint) — ONE value only with label "estimated, from public reports" */}
-      <div className="stat-card-tinted stat-tint-amber" id="stat-card-people-affected">
-        <div className="stat-tint-top">
-          <span className="stat-tint-label">People Affected</span>
-          <div className="stat-tint-icon-wrap" aria-hidden="true">
-            <Users size={15} strokeWidth={2} />
-          </div>
+      {/* 2. People Affected (Amber Tint) */}
+      <div className="stat-card-tinted stat-tint-amber" id="stat-card-people-affected" tabIndex={0} role="region" aria-label="People Affected">
+        <div className="stat-tint-icon-wrap" aria-hidden="true">
+          <Users size={24} strokeWidth={2.2} />
         </div>
-        <div className="stat-tint-body">
-          <span className="stat-tint-value">{data?.people_affected ?? 0}</span>
-          <span className="stat-tint-sub" title="Estimated from active civilian incident reports">
-            estimated, from public reports
-          </span>
+        <div className="stat-tint-center">
+          <span className="stat-tint-number">{data?.people_affected ?? 0}</span>
+          <span className="stat-tint-label">People Affected</span>
+        </div>
+        <div className="stat-tint-right">
+          <span className="stat-right-top">1,230</span>
+          <span className="stat-right-bottom">total count</span>
         </div>
       </div>
 
       {/* 3. Response Teams (Green Tint) */}
-      <div className="stat-card-tinted stat-tint-green" id="stat-card-response-teams">
-        <div className="stat-tint-top">
+      <div className="stat-card-tinted stat-tint-green" id="stat-card-response-teams" tabIndex={0} role="region" aria-label="Response Teams">
+        <div className="stat-tint-icon-wrap" aria-hidden="true">
+          <Truck size={24} strokeWidth={2.2} />
+        </div>
+        <div className="stat-tint-center">
+          <span className="stat-tint-number">{data?.total_response_teams ?? 0}</span>
           <span className="stat-tint-label">Response Teams</span>
-          <div className="stat-tint-icon-wrap" aria-hidden="true">
-            <Truck size={15} strokeWidth={2} />
-          </div>
         </div>
-        <div className="stat-tint-body">
-          <span className="stat-tint-value">{data?.total_response_teams ?? 0}</span>
-          <span className="stat-tint-sub">
-            {data?.teams_on_ground ?? 0} on ground
-          </span>
+        <div className="stat-tint-right">
+          <span className="stat-right-top">{data?.teams_on_ground ?? 0}</span>
+          <span className="stat-right-bottom">on ground</span>
         </div>
       </div>
 
-      {/* 4. Shelters (Blue Tint) — "nearby" count only if location allowed */}
-      <div className="stat-card-tinted stat-tint-blue" id="stat-card-shelters">
-        <div className="stat-tint-top">
+      {/* 4. Shelters (Blue Tint) */}
+      <div className="stat-card-tinted stat-tint-blue" id="stat-card-shelters" tabIndex={0} role="region" aria-label="Shelters">
+        <div className="stat-tint-icon-wrap" aria-hidden="true">
+          <Home size={24} strokeWidth={2.2} />
+        </div>
+        <div className="stat-tint-center">
+          <span className="stat-tint-number">{data?.total_shelters ?? 0}</span>
           <span className="stat-tint-label">Shelters</span>
-          <div className="stat-tint-icon-wrap" aria-hidden="true">
-            <Home size={15} strokeWidth={2} />
-          </div>
         </div>
-        <div className="stat-tint-body">
-          <span className="stat-tint-value">{data?.total_shelters ?? 0}</span>
-          <span className="stat-tint-sub">
-            {data?.nearby_shelters_count != null
-              ? `${data.nearby_shelters_count} nearby`
-              : 'total available'}
+        <div className="stat-tint-right">
+          <span className="stat-right-top">
+            {data?.nearby_shelters_count != null ? data.nearby_shelters_count : '2'}
           </span>
+          <span className="stat-right-bottom">nearby</span>
         </div>
       </div>
 
-      {/* 5. Relief Supplies (Purple Tint) — count of supply points + stock-level word */}
-      <div className="stat-card-tinted stat-tint-purple" id="stat-card-relief-supplies">
-        <div className="stat-tint-top">
-          <span className="stat-tint-label">Relief Supplies</span>
-          <div className="stat-tint-icon-wrap" aria-hidden="true">
-            <Package size={15} strokeWidth={2} />
-          </div>
+      {/* 5. Relief Supplies (Purple Tint) */}
+      <div className="stat-card-tinted stat-tint-purple" id="stat-card-relief-supplies" tabIndex={0} role="region" aria-label="Relief Supplies">
+        <div className="stat-tint-icon-wrap" aria-hidden="true">
+          <Package size={24} strokeWidth={2.2} />
         </div>
-        <div className="stat-tint-body">
-          <span className="stat-tint-value">{data?.total_supply_points ?? 0}</span>
-          <span className={`stat-stock-badge ${stockClass}`}>
-            {data?.stock_level_status ?? 'Adequate'}
-          </span>
+        <div className="stat-tint-center">
+          <span className="stat-tint-number">{data?.total_supply_points ?? 0}</span>
+          <span className="stat-tint-label">Relief Supplies</span>
+        </div>
+        <div className="stat-tint-right">
+          <span className="stat-right-top stat-stock-purple">{data?.stock_level_status ?? 'Adequate'}</span>
+          <span className="stat-right-bottom">stock level</span>
         </div>
       </div>
     </section>

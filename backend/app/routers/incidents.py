@@ -1,4 +1,4 @@
-﻿"""
+"""
 Incident routes â€” CRUD + assignment + status management.
 """
 
@@ -668,6 +668,63 @@ async def update_status(
         category=cat_val,
         priority=prio_val,
     )
+
+    return incident
+
+
+# ── Admin/Responder: mark as responding ───────────────────────
+
+@router.post("/{incident_id}/respond", response_model=IncidentOut)
+async def mark_as_responding(
+    incident_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "responder")),
+):
+    result = await db.execute(
+        select(Incident).where(Incident.id == incident_id)
+    )
+    incident = result.scalar_one_or_none()
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+
+    old_status = incident.status.value if hasattr(incident.status, 'value') else incident.status
+
+    # Record history
+    history = StatusHistory(
+        incident_id=incident_id,
+        old_status=old_status,
+        new_status=StatusEnum.in_progress.value,
+        changed_by=current_user.id,
+        note="Marked as responding by emergency personnel",
+    )
+    db.add(history)
+
+    incident.status = StatusEnum.in_progress
+
+    client_ip = request.client.host if request.client else None
+    await record_audit_event(
+        db,
+        action="incident.marked_responding",
+        actor_id=current_user.id,
+        actor_role=current_user.role.value,
+        entity_type="incident",
+        entity_id=incident_id,
+        ip_address=client_ip,
+    )
+
+    await db.commit()
+    await db.refresh(incident)
+
+    notif_svc = NotificationService(db)
+    await notif_svc.notify_status_change(
+        incident=incident,
+        old_status=old_status,
+        new_status=StatusEnum.in_progress.value,
+        changed_by_id=current_user.id,
+        extra_message="Emergency team is actively responding",
+    )
+    await db.commit()
 
     return incident
 

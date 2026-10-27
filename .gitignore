@@ -30,3 +30,12 @@ lambda/*.zip
 # Uploaded files
 uploads/
 **/uploads/
+
+# Local screenshots & scratch testing scripts
+*.png
+capture_screenshots.mjs
+test_pages.mjs
+sample_precise.py
+sample_reference_colors.py
+scan_boxes.py
+final_samples.py

@@ -1,6 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './context/ToastContext';
 import AppLayout from './components/AppLayout';
 import LoginPage from './pages/LoginPage';
@@ -15,6 +14,7 @@ import ResourcesPage from './pages/ResourcesPage';
 import AuditLog from './pages/AuditLog';
 import CitizenResources from './pages/CitizenResources';
 import CitizenUpdates from './pages/CitizenUpdates';
+import ErrorBoundary from './components/ui/ErrorBoundary';
 import './index.css';
 
 function ProtectedRoute({ children, roles }) {
@@ -35,41 +35,39 @@ function RootRedirect() {
 
 function App() {
   return (
-    <ThemeProvider>
-      <ToastProvider>
-        <AuthProvider>
-          <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/" element={<RootRedirect />} />
+    <ToastProvider>
+      <AuthProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/" element={<RootRedirect />} />
 
-          {/* Citizen routes */}
-          <Route element={<ProtectedRoute roles={['citizen', 'admin', 'responder']}><AppLayout /></ProtectedRoute>}>
-            <Route path="/citizen" element={<CitizenOverview />} />
-            <Route path="/citizen/map" element={<LiveMap />} />
-            <Route path="/map" element={<Navigate to="/citizen/map" replace />} />
-            <Route path="/citizen/requests" element={<MyRequests />} />
-            <Route path="/citizen/my-requests" element={<Navigate to="/citizen/requests" replace />} />
-            <Route path="/citizen/report" element={<ReportIncident />} />
-            <Route path="/citizen/resources" element={<CitizenResources />} />
-            <Route path="/citizen/updates" element={<CitizenUpdates />} />
-          </Route>
+            {/* Citizen routes */}
+            <Route element={<ProtectedRoute roles={['citizen', 'admin', 'responder']}><AppLayout /></ProtectedRoute>}>
+              <Route path="/citizen" element={<ErrorBoundary title="Failed to load Citizen Overview"><CitizenOverview /></ErrorBoundary>} />
+              <Route path="/citizen/map" element={<ErrorBoundary title="Failed to load Live Map"><LiveMap /></ErrorBoundary>} />
+              <Route path="/map" element={<Navigate to="/citizen/map" replace />} />
+              <Route path="/citizen/requests" element={<ErrorBoundary title="Failed to load My Requests"><MyRequests /></ErrorBoundary>} />
+              <Route path="/citizen/my-requests" element={<Navigate to="/citizen/requests" replace />} />
+              <Route path="/citizen/report" element={<ErrorBoundary title="Failed to load Report Emergency"><ReportIncident /></ErrorBoundary>} />
+              <Route path="/citizen/resources" element={<ErrorBoundary title="Failed to load Resources"><CitizenResources /></ErrorBoundary>} />
+              <Route path="/citizen/updates" element={<ErrorBoundary title="Failed to load Updates"><CitizenUpdates /></ErrorBoundary>} />
+            </Route>
 
-          {/* Admin / Responder routes */}
-          <Route element={<ProtectedRoute roles={['admin', 'responder']}><AppLayout /></ProtectedRoute>}>
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/admin/incidents/:id" element={<IncidentDetail />} />
-            <Route path="/admin/teams" element={<ProtectedRoute roles={['admin']}><TeamsPage /></ProtectedRoute>} />
-            <Route path="/admin/resources" element={<ProtectedRoute roles={['admin']}><ResourcesPage /></ProtectedRoute>} />
-            <Route path="/admin/audit-log" element={<ProtectedRoute roles={['admin']}><AuditLog /></ProtectedRoute>} />
-          </Route>
+            {/* Admin / Responder routes */}
+            <Route element={<ProtectedRoute roles={['admin', 'responder']}><AppLayout /></ProtectedRoute>}>
+              <Route path="/admin" element={<ErrorBoundary title="Failed to load Admin Dashboard"><AdminDashboard /></ErrorBoundary>} />
+              <Route path="/admin/incidents/:id" element={<ErrorBoundary title="Failed to load Incident Details"><IncidentDetail /></ErrorBoundary>} />
+              <Route path="/admin/teams" element={<ProtectedRoute roles={['admin']}><ErrorBoundary title="Failed to load Teams"><TeamsPage /></ErrorBoundary></ProtectedRoute>} />
+              <Route path="/admin/resources" element={<ProtectedRoute roles={['admin']}><ErrorBoundary title="Failed to load Resources"><ResourcesPage /></ErrorBoundary></ProtectedRoute>} />
+              <Route path="/admin/audit-log" element={<ProtectedRoute roles={['admin']}><ErrorBoundary title="Failed to load Audit Log"><AuditLog /></ErrorBoundary></ProtectedRoute>} />
+            </Route>
 
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
-      </ToastProvider>
-    </ThemeProvider>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
+    </ToastProvider>
   );
 }
 

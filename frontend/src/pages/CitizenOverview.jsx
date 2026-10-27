@@ -190,6 +190,16 @@ export default function CitizenOverview() {
 
       {/* ── 2. Summary Cards for User's Own Requests (Total, Active, Resolved) ── */}
       <section aria-label="My emergency requests summary">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            My Requests Overview
+          </span>
+          <div className="live-indicator-wrap">
+            <span className="live-indicator-dot" />
+            <span>Live Sync · Updated just now</span>
+          </div>
+        </div>
+
         {loading && !data ? (
           <div className="ui-stat-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
             <SkeletonStatCard />
@@ -197,14 +207,15 @@ export default function CitizenOverview() {
             <SkeletonStatCard />
           </div>
         ) : (
-          <div className="ui-stat-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-            {/* Total Requests */}
+          <div className="ui-stat-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+            {/* Total Requests - Blue Tinted */}
             <div
-              className="ui-stat-card ui-stat-default is-clickable"
+              className="stat-card-tinted stat-tint-blue stat-card-gradient-border is-clickable"
               onClick={() => navigate('/citizen/requests')}
               role="button"
               tabIndex={0}
               id="stat-card-total"
+              style={{ cursor: 'pointer' }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
@@ -212,23 +223,28 @@ export default function CitizenOverview() {
                 }
               }}
             >
-              <div className="ui-stat-header">
-                <span className="ui-stat-label">Total Requests</span>
-                <ClipboardList size={18} strokeWidth={1.8} className="ui-stat-icon" />
+              <div className="stat-tint-top">
+                <span className="stat-tint-label" style={{ color: 'var(--text-secondary)' }}>Total Requests</span>
+                <div className="stat-tint-icon-wrap">
+                  <ClipboardList size={16} strokeWidth={2} />
+                </div>
               </div>
-              <div className="ui-stat-value">{data?.stats?.total ?? 0}</div>
-              <div className="ui-stat-meta">
+              <div className="stat-tint-value" style={{ fontSize: 28, fontWeight: 700, color: 'var(--text-primary)', margin: '8px 0 4px' }}>
+                {data?.stats?.total ?? 0}
+              </div>
+              <div className="stat-tint-trend" style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
                 Submitted by you &bull; View all &rarr;
               </div>
             </div>
 
-            {/* Active Requests */}
+            {/* Active Requests - Red Tinted with pulse */}
             <div
-              className="ui-stat-card ui-stat-critical is-clickable"
+              className="stat-card-tinted stat-tint-red stat-card-gradient-border is-clickable"
               onClick={() => navigate('/citizen/requests?status=reported')}
               role="button"
               tabIndex={0}
               id="stat-card-active"
+              style={{ cursor: 'pointer' }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
@@ -236,23 +252,28 @@ export default function CitizenOverview() {
                 }
               }}
             >
-              <div className="ui-stat-header">
-                <span className="ui-stat-label">Active Emergencies</span>
-                <AlertTriangle size={18} strokeWidth={1.8} className="ui-stat-icon" style={{ color: 'var(--critical-default)' }} />
+              <div className="stat-tint-top">
+                <span className="stat-tint-label" style={{ color: 'var(--text-secondary)' }}>Active Emergencies</span>
+                <div className="stat-tint-icon-wrap critical-pulse-badge">
+                  <AlertTriangle size={16} strokeWidth={2} />
+                </div>
               </div>
-              <div className="ui-stat-value">{data?.stats?.active ?? 0}</div>
-              <div className="ui-stat-meta">
+              <div className="stat-tint-value" style={{ fontSize: 28, fontWeight: 700, color: 'var(--text-primary)', margin: '8px 0 4px' }}>
+                {data?.stats?.active ?? 0}
+              </div>
+              <div className="stat-tint-trend" style={{ fontSize: 11, color: '#EF4444' }}>
                 Awaiting / in active response &rarr;
               </div>
             </div>
 
-            {/* Resolved Requests */}
+            {/* Resolved Requests - Green Tinted */}
             <div
-              className="ui-stat-card ui-stat-success is-clickable"
+              className="stat-card-tinted stat-tint-green stat-card-gradient-border is-clickable"
               onClick={() => navigate('/citizen/requests?status=resolved')}
               role="button"
               tabIndex={0}
               id="stat-card-resolved"
+              style={{ cursor: 'pointer' }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
@@ -260,12 +281,16 @@ export default function CitizenOverview() {
                 }
               }}
             >
-              <div className="ui-stat-header">
-                <span className="ui-stat-label">Resolved Cases</span>
-                <CheckCircle2 size={18} strokeWidth={1.8} className="ui-stat-icon" style={{ color: 'var(--success-default)' }} />
+              <div className="stat-tint-top">
+                <span className="stat-tint-label" style={{ color: 'var(--text-secondary)' }}>Resolved Cases</span>
+                <div className="stat-tint-icon-wrap">
+                  <CheckCircle2 size={16} strokeWidth={2} />
+                </div>
               </div>
-              <div className="ui-stat-value">{data?.stats?.resolved ?? 0}</div>
-              <div className="ui-stat-meta">
+              <div className="stat-tint-value" style={{ fontSize: 28, fontWeight: 700, color: 'var(--text-primary)', margin: '8px 0 4px' }}>
+                {data?.stats?.resolved ?? 0}
+              </div>
+              <div className="stat-tint-trend" style={{ fontSize: 11, color: '#10B981' }}>
                 Completed relief cases &rarr;
               </div>
             </div>

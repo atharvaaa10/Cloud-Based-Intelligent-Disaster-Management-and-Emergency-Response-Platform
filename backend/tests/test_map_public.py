@@ -147,3 +147,78 @@ async def test_get_public_map_bbox_filtering(client: AsyncClient):
     codes = [i["public_code"] for i in data["incidents"]]
     assert "DR-BBOX1" in codes
     assert "DR-BBOX2" not in codes
+
+
+async def test_citizen_forbidden_on_admin_respond_and_assign(client: AsyncClient):
+    """Citizen role must get 403 Forbidden on /incidents/{id}/respond and /incidents/{id}/assign."""
+    # Register and log in as citizen
+    token_citizen = await register_and_login(client, "Citizen User", "citizen_role_test@test.com", "Password123")
+    citizen_hdrs = auth_header(token_citizen)
+
+    # Create an incident
+    res = await client.post(
+        "/incidents",
+        json={
+            "category": "rescue",
+            "description": "Flash flood testing incident",
+            "location_text": "Paud Road, Pune",
+            "latitude": 18.5080,
+            "longitude": 73.8090,
+            "people_affected": 2,
+        },
+        headers=citizen_hdrs,
+    )
+    assert res.status_code == 201
+    inc_id = res.json()["id"]
+
+    # 1. Citizen attempts POST /incidents/{id}/respond -> 403
+    resp_respond = await client.post(f"/incidents/{inc_id}/respond", headers=citizen_hdrs)
+    assert resp_respond.status_code == 403, f"Expected 403 on respond, got {resp_respond.status_code}"
+
+    # 2. Citizen attempts POST /incidents/{id}/assign -> 403
+    resp_assign = await client.post(
+        f"/incidents/{inc_id}/assign",
+        json={"team_id": 1},
+        headers=citizen_hdrs,
+    )
+    assert resp_assign.status_code == 403, f"Expected 403 on assign, got {resp_assign.status_code}"
+
+
+async def test_public_map_never_returns_sensitive_fields(client: AsyncClient):
+    """Confirm GET /map/public never returns description, photo_url, photo_key, or reporter fields."""
+    token = await register_and_login(client, "Reporter Citizen", "reporter_priv@test.com", "Password123")
+    res = await client.post(
+        "/incidents",
+        json={
+            "category": "medical",
+            "description": "CONFIDENTIAL: Severe diabetic shock patient needing ambulance",
+            "location_text": "Shivajinagar Station, Pune",
+            "latitude": 18.5310,
+            "longitude": 73.8550,
+            "people_affected": 1,
+        },
+        headers=auth_header(token),
+    )
+    assert res.status_code == 201
+
+    resp = await client.get("/map/public")
+    assert resp.status_code == 200
+    data = resp.json()
+
+    # Verify every incident marker has NO sensitive fields
+    for inc in data["incidents"]:
+        assert "description" not in inc
+        assert "photo_url" not in inc
+        assert "photo_key" not in inc
+        assert "reporter" not in inc
+        assert "reporter_id" not in inc
+        assert "reporter_name" not in inc
+        assert "phone" not in inc
+
+    # Verify teams in public map return only name, approx coords and status
+    assert "teams" in data
+    for team in data["teams"]:
+        assert "name" in team
+        assert "status" in team
+        assert "contact" not in team
+        assert "lead_phone" not in team

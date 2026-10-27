@@ -14,3 +14,4 @@ export { default as StatCard } from './StatCard';
 export { default as GlobalStatRow } from './GlobalStatRow';
 export { default as Spinner } from './Spinner';
 export { default as Timeline, formatRelativeTime, formatFullTime } from './Timeline';
+export { default as ErrorBoundary } from './ErrorBoundary';

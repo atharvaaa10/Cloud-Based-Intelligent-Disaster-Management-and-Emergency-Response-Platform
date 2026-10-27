@@ -8,11 +8,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models import Incident, Place, PlaceTypeEnum
+from app.models import Incident, Place, PlaceTypeEnum, ResponseTeam
 from app.schemas import (
     AffectedZoneOut,
     PlaceOut,
     PublicIncidentMarker,
+    PublicTeamMarker,
     PublicMapResponse,
 )
 
@@ -193,10 +194,30 @@ async def get_public_map_data(
             continue
         filtered_zones.append(AffectedZoneOut(**z))
 
+    # ── Query Public Response Teams (Sanitized: only name, approximate coords, and status) ──
+    teams_query = select(ResponseTeam)
+    teams_res = await db.execute(teams_query)
+    raw_teams = teams_res.scalars().all()
+    public_teams: List[PublicTeamMarker] = []
+    for t in raw_teams:
+        t_lat = round_coord_approx(t.latitude) if t.latitude is not None else None
+        t_lon = round_coord_approx(t.longitude) if t.longitude is not None else None
+        public_teams.append(
+            PublicTeamMarker(
+                id=t.id,
+                name=t.name,
+                approx_latitude=t_lat,
+                approx_longitude=t_lon,
+                status=t.status.value if hasattr(t.status, "value") else str(t.status),
+            )
+        )
+
     return PublicMapResponse(
         incidents=public_incidents,
         places=places_out,
         affected_zones=filtered_zones,
+        teams=public_teams,
         total_public_incidents=len(public_incidents),
         total_places=len(places_out),
+        total_teams=len(public_teams),
     )
