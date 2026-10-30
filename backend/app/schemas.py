@@ -368,6 +368,8 @@ class CitizenStats(BaseModel):
     total: int
     active: int
     resolved: int
+    under_review: int = 0
+    in_progress: int = 0
 
 
 class NearbyShelterOut(BaseModel):

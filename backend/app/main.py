@@ -86,6 +86,8 @@ app.include_router(resources.router)
 app.include_router(places.router)
 app.include_router(response_teams.router)
 app.include_router(notifications.router)
+# Direct public route alias for /announcements
+app.add_api_route("/announcements", notifications.list_announcements, methods=["GET"], tags=["notifications"])
 app.include_router(uploads.router)
 app.include_router(internal.router)
 app.include_router(admin.router)

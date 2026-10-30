@@ -20,6 +20,19 @@ async function request(method, path, body = null) {
   const res = await fetch(`${BASE}${path}`, opts);
   if (res.status === 204) return null;
 
+  // Shared 401 response interceptor
+  if (res.status === 401) {
+    localStorage.removeItem('token');
+    // If not already on /login, redirect with session expired message
+    if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+      const msg = encodeURIComponent('Session expired, please sign in again');
+      window.location.href = `/login?message=${msg}`;
+    }
+    const error = new Error('Session expired, please sign in again');
+    error.status = 401;
+    throw error;
+  }
+
   const data = await res.json();
   if (!res.ok) {
     // FastAPI 422 validation errors: detail is an array of {loc, msg, type} objects.
@@ -45,6 +58,7 @@ async function request(method, path, body = null) {
       msg = JSON.stringify(data);
     }
     const error = new Error(msg);
+    error.status = res.status;
     error.validationErrors = Array.isArray(detail) ? detail : null;
     throw error;
   }

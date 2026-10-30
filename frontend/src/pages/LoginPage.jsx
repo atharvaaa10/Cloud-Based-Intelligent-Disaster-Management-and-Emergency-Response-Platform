@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { ShieldAlert, Eye, EyeOff, Lock, Mail, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Button, Input } from '../components/ui';
@@ -7,10 +7,12 @@ import { Button, Input } from '../components/ui';
 export default function LoginPage() {
   const { login, register } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [isRegister, setIsRegister] = useState(false);
   const [form, setForm] = useState({ name: '', email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
+  const queryMessage = new URLSearchParams(location.search).get('message');
+  const [error, setError] = useState(queryMessage || '');
   const [loading, setLoading] = useState(false);
 
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });

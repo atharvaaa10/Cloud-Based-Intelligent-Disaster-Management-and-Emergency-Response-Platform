@@ -1,25 +1,27 @@
-﻿import { useState, useEffect, useCallback, useRef } from "react";
-import { useAuth } from "../context/AuthContext";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { api } from "../api";
 
 const POLL_MS = 30_000;
 
 export function useBellCount() {
-  const { token, user } = useAuth();
   const [count, setCount] = useState(0);
   const timerRef = useRef(null);
 
   const refresh = useCallback(async () => {
-    if (!token || !user) { setCount(0); return; }
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setCount(0);
+      return;
+    }
     try {
-      const res = await fetch("/notifications/unread-count", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setCount(data.unread_count ?? 0);
+      const data = await api.get("/notifications/unread-count");
+      if (data && typeof data.unread_count === 'number') {
+        setCount(data.unread_count);
       }
-    } catch { /* silent */ }
-  }, [token, user]);
+    } catch {
+      /* silent */
+    }
+  }, []);
 
   useEffect(() => {
     refresh();

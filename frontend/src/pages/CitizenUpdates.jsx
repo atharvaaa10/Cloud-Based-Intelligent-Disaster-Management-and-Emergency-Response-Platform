@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Bell, BellOff, CheckCheck, AlertTriangle, Shield, Info,
@@ -6,7 +6,7 @@ import {
   AlertCircle, Users, CheckCircle2, XCircle, Clock, Activity,
   Siren,
 } from "lucide-react";
-import { useAuth } from "../context/AuthContext";
+import { api } from "../api";
 
 // ─── Poll interval ────────────────────────────────────────────────────────────
 const POLL_INTERVAL_MS = 30_000;
@@ -98,6 +98,7 @@ function NotificationCard({ notif, onMarkRead }) {
 function AnnouncementCard({ ann }) {
   const meta = getSeverityMeta(ann.severity);
   const Icon = meta.icon;
+
   return (
     <div className="ann-card" style={{ borderColor: meta.border, background: meta.bg }}>
       <div className="ann-icon" style={{ color: meta.color }}>
@@ -144,7 +145,6 @@ const FILTERS = [
 
 // ─── Main page ─────────────────────────────────────────────────────────────────
 export default function CitizenUpdates() {
-  const { token } = useAuth();
   const [notifications, setNotifications] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading]     = useState(true);
@@ -158,21 +158,18 @@ export default function CitizenUpdates() {
     if (!quiet) setLoading(true);
     setError(null);
     try {
-      const headers = { Authorization: `Bearer ${token}` };
-      const [nRes, aRes] = await Promise.all([
-        fetch("/notifications?limit=100", { headers }),
-        fetch("/notifications/announcements"),
+      const [nData, aData] = await Promise.all([
+        api.get("/notifications?limit=100"),
+        api.get("/announcements"),
       ]);
-      if (!nRes.ok) throw new Error(`Notifications: ${nRes.status}`);
-      const [nData, aData] = await Promise.all([nRes.json(), aRes.json()]);
-      setNotifications(nData);
-      setAnnouncements(aData);
+      setNotifications(Array.isArray(nData) ? nData : []);
+      setAnnouncements(Array.isArray(aData) ? aData : []);
     } catch (e) {
-      setError(e.message || "Could not load updates.");
+      setError("Couldn't load notifications. Check your connection.");
     } finally {
       if (!quiet) setLoading(false);
     }
-  }, [token]);
+  }, []);
 
   useEffect(() => {
     fetchAll();
@@ -183,24 +180,18 @@ export default function CitizenUpdates() {
   // ── Mark one read ──────────────────────────────────────────────
   const markRead = useCallback(async (id) => {
     try {
-      await fetch(`/notifications/${id}/read`, {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await api.patch(`/notifications/${id}/read`);
       setNotifications(prev =>
         prev.map(n => n.id === id ? { ...n, is_read: true } : n)
       );
     } catch { /* silent */ }
-  }, [token]);
+  }, []);
 
   // ── Mark all read ──────────────────────────────────────────────
   const markAllRead = async () => {
     setMarkingAll(true);
     try {
-      await fetch("/notifications/read-all", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await api.post("/notifications/read-all");
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
     } catch { /* silent */ }
     finally { setMarkingAll(false); }
@@ -228,7 +219,7 @@ export default function CitizenUpdates() {
         <div>
           <h1 className="page-heading">
             <Bell size={22} strokeWidth={1.8} style={{ color: "var(--accent-primary)" }} />
-            Updates & Notifications
+            Updates
           </h1>
           <p className="page-subheading">
             Real-time alerts for your incidents and emergency announcements
@@ -261,7 +252,7 @@ export default function CitizenUpdates() {
 
       {/* Error banner */}
       {error && (
-        <div className="updates-error-banner">
+        <div className="updates-error-banner" role="alert">
           <AlertCircle size={14} strokeWidth={2} />
           <span>{error}</span>
           <button onClick={() => fetchAll()} className="loc-error-close">Retry</button>
@@ -313,12 +304,15 @@ export default function CitizenUpdates() {
         {(filter !== "announcement") && (
           <h2 id="notifs-heading" className="section-heading" style={{ marginBottom: 12 }}>
             <Bell size={15} strokeWidth={1.8} style={{ color: "var(--accent-primary)" }} />
-            {filter === "unread" ? `Unread (${unreadCount})` : "Your Notifications"}
+            {filter === "unread" ? `Unread (${unreadCount})` : "Your Updates"}
           </h2>
         )}
         <div className="notifications-list">
           {loading ? (
             Array.from({ length: 5 }).map((_, i) => <NotifSkeleton key={i} />)
+          ) : error ? (
+            /* When an error occurs, do not show the empty state */
+            null
           ) : visibleNotifications.length === 0 ? (
             filter !== "announcement" && (
               <div className="updates-empty-state">

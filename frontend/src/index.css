@@ -407,11 +407,16 @@ button:disabled, input:disabled, select:disabled, textarea:disabled {
 }
 
 .citizen-nav .nav-link.active {
-  background-color: rgba(1, 174, 253, 0.18) !important;
-  color: #01AEFD !important;
+  background-color: #00527D !important;
+  color: #FFFFFF !important;
   font-weight: 600;
-  border: 1px solid rgba(1, 174, 253, 0.35);
-  box-shadow: 0 0 10px rgba(1, 174, 253, 0.2);
+  border-radius: 8px !important;
+  border: 1px solid rgba(1, 174, 253, 0.45);
+  box-shadow: 0 2px 10px rgba(1, 174, 253, 0.25);
+}
+
+.citizen-nav .nav-link.active .nav-link-icon {
+  color: #22C7FF;
 }
 
 .citizen-nav .nav-link-icon {
@@ -486,6 +491,31 @@ button:disabled, input:disabled, select:disabled, textarea:disabled {
   background: rgba(239, 68, 68, 0.1);
   border-color: rgba(239, 68, 68, 0.3);
   color: #EF4444;
+}
+
+.citizen-theme-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.citizen-theme-btn:hover {
+  border-color: var(--primary);
+  color: #F4F7FA;
+  background: #14212C;
+}
+
+.citizen-theme-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 .citizen-hamburger-btn {
@@ -2105,7 +2135,7 @@ button:disabled, input:disabled, select:disabled, textarea:disabled {
   }
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 820px) {
   .citizen-nav-desktop {
     display: none !important;
   }

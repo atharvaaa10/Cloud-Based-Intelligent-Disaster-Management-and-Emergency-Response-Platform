@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "lint": "oxlint",
+    "lint": "oxlint && npm run check:carto",
+    "check:carto": "node scripts/check-no-carto.js",
     "preview": "vite preview"
   },
   "dependencies": {

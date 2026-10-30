@@ -50,7 +50,7 @@ export default function AppLayout() {
     if (p === '/citizen/map' || p === '/map') return 'Live disaster map';
     if (p === '/citizen/requests' || p === '/citizen/my-requests') return 'My emergency requests';
     if (p === '/citizen/resources') return 'Emergency resources';
-    if (p === '/citizen/updates') return 'Updates & notifications';
+    if (p === '/citizen/updates') return 'Updates';
     if (p === '/citizen') return 'Citizen overview';
     return 'Disaster management';
   };
@@ -120,13 +120,6 @@ export default function AppLayout() {
                 <span>Live map</span>
               </NavLink>
               <NavLink
-                to="/citizen/resources"
-                className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
-              >
-                <LifeBuoy size={15} strokeWidth={1.9} className="nav-link-icon" />
-                <span>Resources</span>
-              </NavLink>
-              <NavLink
                 to="/citizen/updates"
                 className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
                 style={{ position: 'relative' }}
@@ -141,7 +134,7 @@ export default function AppLayout() {
               </NavLink>
             </nav>
 
-            {/* Right: Theme Toggle, User Avatar Circle + Name/Role, Outlined Sign Out */}
+            {/* Right: User Avatar Circle + Name/Role, Outlined Sign Out */}
             <div className="citizen-header-right">
               <div className="citizen-user-profile">
                 <div className="citizen-avatar-circle" aria-hidden="true">

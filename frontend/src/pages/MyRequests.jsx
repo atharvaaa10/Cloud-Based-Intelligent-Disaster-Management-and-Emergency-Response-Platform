@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Search,
   Filter,
@@ -76,10 +76,12 @@ export default function MyRequests() {
   const navigate = useNavigate();
   const toast = useToast();
 
+  const [searchParams] = useSearchParams();
+
   // ── Query & Filter State ─────────────────────────────────────────────────────
   const [page, setPage] = useState(1);
   const [limit] = useState(10);
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState(() => searchParams.get('status') || '');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -93,7 +95,22 @@ export default function MyRequests() {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // ── Drawer & Detail State ────────────────────────────────────────────────────
-  const [selectedId, setSelectedId] = useState(null);
+  const [selectedId, setSelectedId] = useState(() => {
+    const pId = searchParams.get('id');
+    return pId ? Number(pId) : null;
+  });
+
+  useEffect(() => {
+    const s = searchParams.get('status');
+    if (s !== null) {
+      setStatusFilter(s);
+      setPage(1);
+    }
+    const pId = searchParams.get('id');
+    if (pId) {
+      setSelectedId(Number(pId));
+    }
+  }, [searchParams]);
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
 

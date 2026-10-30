@@ -41,41 +41,44 @@ def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 
 
 # Official public advisories for Pune disaster preparedness & emergency alerts
-DEFAULT_ANNOUNCEMENTS = [
-    {
-        "id": "ann-1",
-        "title": "IMD Red Alert Warning: Heavy Rainfall Forecast in Pune & Ghats",
-        "message": "Continuous heavy downpours expected across Pune city, Pimpri-Chinchwad, and Maval over the next 24-48 hours. Citizens are strongly advised to avoid low-lying bridges and waterlogged underpasses.",
-        "severity": "critical",
-        "source": "District Disaster Management Authority (DDMA), Pune",
-        "issued_at": datetime(2026, 10, 25, 8, 30, tzinfo=timezone.utc),
-        "active": True,
-    },
-    {
-        "id": "ann-2",
-        "title": "Khadakwasla Dam Controlled Water Discharge",
-        "message": "Controlled release of 14,800 cusecs initiated into Mutha River basin. High vigilance advised for riverfront areas along Deccan Gymkhana, Pulachi Wadi, and Sinhagad Road.",
-        "severity": "warning",
-        "source": "Water Resources Department & PMC Flood Cell",
-        "issued_at": datetime(2026, 10, 25, 14, 0, tzinfo=timezone.utc),
-        "active": True,
-    },
-    {
-        "id": "ann-3",
-        "title": "Emergency Control Room & Relief Helpline Numbers",
-        "message": "Pune Municipal Corporation Disaster Helpline: 020-25501269 / 020-25506800. Police: 112. Fire & Rescue: 101. NDRF Control Room: 1077 (Toll-free).",
-        "severity": "info",
-        "source": "Pune Smart City Emergency Operations Center (EOC)",
-        "issued_at": datetime(2026, 10, 25, 6, 0, tzinfo=timezone.utc),
-        "active": True,
-    },
-]
+def get_default_announcements():
+    now = datetime.now(timezone.utc)
+    return [
+        {
+            "id": "ann-1",
+            "title": "Heavy rainfall expected",
+            "message": "IMD has issued an orange alert for Pune district.",
+            "severity": "warning",
+            "source": "District Disaster Management Authority (DDMA), Pune",
+            "issued_at": now - timedelta(hours=2),
+            "active": True,
+        },
+        {
+            "id": "ann-2",
+            "title": "Shelter capacity updated",
+            "message": "Kothrud Relief Shelter now has 50 available slots.",
+            "severity": "info",
+            "source": "Pune Municipal Corporation",
+            "issued_at": now - timedelta(hours=5),
+            "active": True,
+        },
+        {
+            "id": "ann-3",
+            "title": "System maintenance",
+            "message": "The platform will be under maintenance tomorrow from 2 AM to 4 AM.",
+            "severity": "low",
+            "source": "ResQCloud Operations Team",
+            "issued_at": now - timedelta(days=1),
+            "active": True,
+        },
+    ]
 
 
 @router.get("/overview", response_model=CitizenOverviewOut)
 async def get_citizen_overview(
     lat: Optional[float] = Query(None, ge=-90, le=90, description="Citizen latitude"),
     lon: Optional[float] = Query(None, ge=-180, le=180, description="Citizen longitude"),
+    limit: int = Query(3, ge=1, le=20, description="Max recent requests"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -101,6 +104,20 @@ async def get_citizen_overview(
     )
     active_count = (await db.execute(active_q)).scalar_one()
 
+    # Under review requests
+    under_review_q = select(func.count(Incident.id)).where(
+        Incident.reporter_id == current_user.id,
+        Incident.status == StatusEnum.under_review,
+    )
+    under_review_count = (await db.execute(under_review_q)).scalar_one()
+
+    # Response in progress requests (in_progress or assigned)
+    in_progress_q = select(func.count(Incident.id)).where(
+        Incident.reporter_id == current_user.id,
+        Incident.status.in_([StatusEnum.in_progress, StatusEnum.assigned]),
+    )
+    in_progress_count = (await db.execute(in_progress_q)).scalar_one()
+
     # Resolved requests: resolved
     resolved_q = select(func.count(Incident.id)).where(
         Incident.reporter_id == current_user.id,
@@ -112,14 +129,16 @@ async def get_citizen_overview(
         total=total_count,
         active=active_count,
         resolved=resolved_count,
+        under_review=under_review_count,
+        in_progress=in_progress_count,
     )
 
-    # ── 2. The 3 Most Recent Requests ────────────────────────────
+    # ── 2. The Most Recent Requests ────────────────────────────
     recent_q = (
         select(Incident)
         .where(Incident.reporter_id == current_user.id)
         .order_by(Incident.created_at.desc())
-        .limit(3)
+        .limit(limit)
     )
     recent_res = await db.execute(recent_q)
     recent_incidents = recent_res.scalars().all()
@@ -183,7 +202,7 @@ async def get_citizen_overview(
     closest_shelters = shelters_with_dist[:3]
 
     # ── 5. Announcements / Alerts ────────────────────────────────
-    announcements = [AnnouncementOut(**item) for item in DEFAULT_ANNOUNCEMENTS]
+    announcements = [AnnouncementOut(**item) for item in get_default_announcements()]
 
     return CitizenOverviewOut(
         stats=stats,

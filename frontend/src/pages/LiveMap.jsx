@@ -55,6 +55,7 @@ import MapLegend from '../components/map/MapLegend';
 import IncidentCard from '../components/map/IncidentCard';
 import DetailPanel from '../components/map/DetailPanel';
 import NearbyResources from '../components/map/NearbyResources';
+import AppTileLayer from '../components/map/AppTileLayer';
 
 // ── Haversine Distance Formula (km) ────────────────────────────
 function haversineKm(lat1, lon1, lat2, lon2) {
@@ -103,26 +104,6 @@ const CATEGORY_COLORS = {
   food_water: '#F59E0B',
   shelter: '#22C55E',
   other: '#01AEFD',
-};
-
-// ── Dynamic Tile Servers (OpenStreetMap with CSS filter for Map; Esri for Satellite) ──
-const TILE_SERVERS = {
-  map: {
-    name: 'Map',
-    url: import.meta.env.VITE_TILE_DARK_URL || import.meta.env.VITE_TILE_STREET_URL || 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-    options: {
-      maxZoom: 19,
-      attribution: import.meta.env.VITE_TILE_STREET_ATTRIBUTION || '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    },
-  },
-  satellite: {
-    name: 'Satellite',
-    url: import.meta.env.VITE_TILE_SATELLITE_URL || 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    options: {
-      maxZoom: 19,
-      attribution: import.meta.env.VITE_TILE_SATELLITE_ATTRIBUTION || 'Tiles &copy; <a href="https://www.esri.com/">Esri</a>',
-    },
-  },
 };
 
 const ITEMS_PER_PAGE = 5;
@@ -181,7 +162,7 @@ export default function LiveMap() {
   // Leaflet references
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
-  const tileLayerRef = useRef(null);
+  const [mapInstance, setMapInstance] = useState(null);
   const clusterGroupRef = useRef(null);
   const zonesGroupRef = useRef(null);
   const userMarkerRef = useRef(null);
@@ -385,6 +366,7 @@ export default function LiveMap() {
       const map = L.map(mapContainerRef.current, {
         center: [18.5254, 73.8420],
         zoom: 12,
+        maxZoom: 19,
         zoomControl: false,
       });
 
@@ -393,21 +375,6 @@ export default function LiveMap() {
 
       // Bottom-right scale bar
       L.control.scale({ imperial: false, position: 'bottomright' }).addTo(map);
-
-      // Base tile layer
-      const serverConfig = TILE_SERVERS[tileType] || TILE_SERVERS.map;
-      const tileLayer = L.tileLayer(serverConfig.url, serverConfig.options).addTo(map);
-      tileLayerRef.current = tileLayer;
-
-      // Ensure tile pane has appropriate filter or class
-      const tilePane = map.getPane('tilePane');
-      if (tilePane) {
-        if (tileType === 'satellite') {
-          tilePane.classList.add('leaflet-tile-pane-satellite');
-        } else {
-          tilePane.classList.remove('leaflet-tile-pane-satellite');
-        }
-      }
 
       // Group for hazard zones
       zonesGroupRef.current = L.layerGroup().addTo(map);
@@ -432,6 +399,7 @@ export default function LiveMap() {
       clusterGroupRef.current = clusterGroup;
 
       mapInstanceRef.current = map;
+      setMapInstance(map);
 
       // Ensure map calculates correct size after flex/grid layout completes
       setTimeout(() => {
@@ -447,30 +415,10 @@ export default function LiveMap() {
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
+        setMapInstance(null);
       }
     };
   }, []);
-
-  // ── Update Tile Layer on Toggle & Toggle CSS Filter on Tile Pane ─────────────
-  useEffect(() => {
-    if (!mapInstanceRef.current) return;
-    if (tileLayerRef.current) {
-      mapInstanceRef.current.removeLayer(tileLayerRef.current);
-    }
-    const serverConfig = TILE_SERVERS[tileType] || TILE_SERVERS.map;
-    tileLayerRef.current = L.tileLayer(serverConfig.url, serverConfig.options).addTo(
-      mapInstanceRef.current
-    );
-
-    const tilePane = mapInstanceRef.current.getPane('tilePane');
-    if (tilePane) {
-      if (tileType === 'satellite') {
-        tilePane.classList.add('leaflet-tile-pane-satellite');
-      } else {
-        tilePane.classList.remove('leaflet-tile-pane-satellite');
-      }
-    }
-  }, [tileType]);
 
   // ── Render Affected Zones (Dashed red polygon outline with translucent red fill) ──
   useEffect(() => {
@@ -1129,7 +1077,9 @@ export default function LiveMap() {
             description="The interactive map component could not render properly. You can reload or view the incidents in list format."
             compact
           >
-            <div ref={mapContainerRef} className="leaflet-map-root" />
+            <div ref={mapContainerRef} className="leaflet-map-root">
+              {mapInstance && <AppTileLayer map={mapInstance} tileType={tileType} />}
+            </div>
           </ErrorBoundary>
 
           {/* Top-Left Segmented Control (Map vs Satellite) - only control in top-left */}

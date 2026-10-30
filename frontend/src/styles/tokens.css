@@ -11,16 +11,26 @@
 
   /* ── Core Dark Theme Variables ────────────────────────────────── */
   --bg: #0C1117;
-  --nav: #101419;
-  --panel: #13191E;
-  --card: #1B2228;
-  --input: #171D22;
-  --border: #303A42;
+  --nav: #0A1118;
+  --panel: #0D151D;
+  --card: #111C26;
+  --card-elevated: #14212C;
+  --input: #101922;
+  --border: #243442;
+  --border-subtle: #1C2A35;
   --primary: #01AEFD;
   --primary-hover: #22C7FF;
+  --cyan-primary: #01AEFD;
+  --cyan-bright: #22C7FF;
   --text: #F4F7FA;
-  --text-secondary: #A7B0BA;
-  --text-muted: #77828D;
+  --text-secondary: #B8C3CE;
+  --text-muted: #8997A5;
+  --color-critical: #F04438;
+  --color-high: #F59E0B;
+  --color-medium: #FACC15;
+  --color-success: #34D399;
+  --color-info: #0EA5E9;
+  --color-purple: #A855F7;
 
   /* ── Backward-compatible Aliases for Core Tokens ───────────────── */
   --bg-canvas: var(--bg);

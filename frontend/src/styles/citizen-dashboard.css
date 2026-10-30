@@ -1,0 +1,912 @@
+/* ═══════════════════════════════════════════════════════════════════
+   Citizen Home Dashboard Styles
+   Exact Spec & Tokens: #0C1117 bg, #111C26 card, #243442 border, #01AEFD cyan
+   ═══════════════════════════════════════════════════════════════════ */
+
+.citizen-dashboard-container {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 16px 20px 48px;
+  background-color: #0C1117;
+  color: #F4F7FA;
+  min-height: calc(100vh - 56px);
+}
+
+/* Two-column layout: ~72% main, ~28% sidebar, 12-14px gap */
+.citizen-dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 72%) minmax(0, 28%);
+  gap: 12px;
+  align-items: start;
+}
+
+@media (max-width: 860px) {
+  .citizen-dashboard-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+
+.citizen-main-column {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.citizen-sidebar-column {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+/* ── 1. Welcome Hero ────────────────────────────────────────────── */
+.citizen-hero-card {
+  background: #0D151D;
+  border: 1px solid #1C2A35;
+  border-radius: 12px;
+  padding: 22px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+.citizen-hero-left {
+  flex: 1;
+  min-width: 0;
+}
+
+.citizen-hero-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #F4F7FA;
+  margin: 0 0 8px 0;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.citizen-hero-name {
+  color: #01AEFD;
+}
+
+.citizen-hero-desc {
+  font-size: 13px;
+  color: #8997A5;
+  margin: 0 0 16px 0;
+  line-height: 1.5;
+  max-width: 520px;
+}
+
+.citizen-hero-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background-color: #01AEFD;
+  color: #FFFFFF;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 18px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: background-color 150ms ease, box-shadow 150ms ease;
+  box-shadow: 0 2px 8px rgba(1, 174, 253, 0.25);
+}
+
+.citizen-hero-btn:hover {
+  background-color: #22C7FF;
+  box-shadow: 0 4px 14px rgba(1, 174, 253, 0.35);
+}
+
+.citizen-hero-btn:focus-visible {
+  outline: 2px solid #22C7FF;
+  outline-offset: 2px;
+}
+
+.citizen-hero-right {
+  flex-shrink: 0;
+  width: 270px;
+  height: 104px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #1C2A35;
+  position: relative;
+  background: #111C26;
+}
+
+.citizen-hero-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* ── 2. Summary Cards (4 Cards Row) ─────────────────────────────── */
+.citizen-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 860px) {
+  .citizen-summary-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.citizen-summary-card {
+  background: #111C26;
+  border: 1px solid #1C2A35;
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: border-color 150ms ease, background-color 150ms ease, transform 150ms ease;
+  user-select: none;
+}
+
+.citizen-summary-card:hover {
+  background: #14212C;
+  border-color: #243442;
+  transform: translateY(-1px);
+}
+
+.citizen-summary-card:focus-visible {
+  outline: 2px solid #01AEFD;
+  outline-offset: 2px;
+}
+
+.citizen-summary-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.citizen-summary-icon-tile {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.citizen-summary-icon-tile.blue {
+  background: rgba(1, 174, 253, 0.12);
+  color: #01AEFD;
+  border: 1px solid rgba(1, 174, 253, 0.25);
+}
+
+.citizen-summary-icon-tile.amber {
+  background: rgba(245, 158, 11, 0.12);
+  color: #F59E0B;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.citizen-summary-icon-tile.green {
+  background: rgba(52, 211, 153, 0.12);
+  color: #34D399;
+  border: 1px solid rgba(52, 211, 153, 0.25);
+}
+
+.citizen-summary-icon-tile.purple {
+  background: rgba(168, 85, 247, 0.12);
+  color: #A855F7;
+  border: 1px solid rgba(168, 85, 247, 0.25);
+}
+
+.citizen-summary-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.citizen-summary-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #F4F7FA;
+  line-height: 1.15;
+}
+
+.citizen-summary-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #F4F7FA;
+  margin-top: 2px;
+}
+
+.citizen-summary-sub {
+  font-size: 10.5px;
+  color: #8997A5;
+  margin-top: 1px;
+}
+
+.citizen-summary-chevron {
+  color: #8997A5;
+  transition: transform 150ms ease, color 150ms ease;
+  flex-shrink: 0;
+}
+
+.citizen-summary-card:hover .citizen-summary-chevron {
+  color: #F4F7FA;
+  transform: translateX(2px);
+}
+
+/* ── 3. Quick Actions ───────────────────────────────────────────── */
+.citizen-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.citizen-section-title-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.citizen-section-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #F4F7FA;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.citizen-section-sub {
+  font-size: 11.5px;
+  color: #8997A5;
+}
+
+.citizen-section-link {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: #01AEFD;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 150ms ease;
+}
+
+.citizen-section-link:hover {
+  color: #22C7FF;
+  text-decoration: underline;
+}
+
+.citizen-quick-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 860px) {
+  .citizen-quick-actions-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.citizen-action-card {
+  background: #111C26;
+  border: 1px solid #1C2A35;
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: border-color 150ms ease, background-color 150ms ease, transform 150ms ease;
+}
+
+.citizen-action-card:hover {
+  background: #14212C;
+  border-color: #243442;
+  transform: translateY(-1px);
+}
+
+.citizen-action-card.report-danger {
+  border-color: rgba(240, 68, 56, 0.3);
+}
+
+.citizen-action-card.report-danger:hover {
+  border-color: #F04438;
+}
+
+.citizen-action-card:focus-visible {
+  outline: 2px solid #01AEFD;
+  outline-offset: 2px;
+}
+
+.citizen-action-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.citizen-action-icon-tile {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.citizen-action-icon-tile.red {
+  background: rgba(240, 68, 56, 0.12);
+  color: #F04438;
+  border: 1px solid rgba(240, 68, 56, 0.25);
+}
+
+.citizen-action-icon-tile.blue {
+  background: rgba(1, 174, 253, 0.12);
+  color: #01AEFD;
+  border: 1px solid rgba(1, 174, 253, 0.25);
+}
+
+.citizen-action-icon-tile.green {
+  background: rgba(52, 211, 153, 0.12);
+  color: #34D399;
+  border: 1px solid rgba(52, 211, 153, 0.25);
+}
+
+.citizen-action-icon-tile.purple {
+  background: rgba(168, 85, 247, 0.12);
+  color: #A855F7;
+  border: 1px solid rgba(168, 85, 247, 0.25);
+}
+
+.citizen-action-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.citizen-action-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #F4F7FA;
+}
+
+.citizen-action-desc {
+  font-size: 10.5px;
+  color: #8997A5;
+  margin-top: 1px;
+}
+
+.citizen-action-chevron {
+  color: #8997A5;
+  transition: transform 150ms ease, color 150ms ease;
+  flex-shrink: 0;
+}
+
+.citizen-action-card:hover .citizen-action-chevron {
+  color: #F4F7FA;
+  transform: translateX(2px);
+}
+
+/* ── 4. Recent Requests Table ───────────────────────────────────── */
+.citizen-table-card {
+  background: #111C26;
+  border: 1px solid #1C2A35;
+  border-radius: 10px;
+  padding: 16px 18px;
+  overflow: hidden;
+}
+
+.citizen-table-wrapper {
+  overflow-x: auto;
+  margin-top: 10px;
+}
+
+.citizen-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 12px;
+}
+
+.citizen-table th {
+  text-align: left;
+  padding: 10px 12px;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #8997A5;
+  border-bottom: 1px solid #1C2A35;
+  background: #0D151D;
+  white-space: nowrap;
+}
+
+.citizen-table th:first-child {
+  border-top-left-radius: 6px;
+  border-bottom-left-radius: 6px;
+}
+
+.citizen-table th:last-child {
+  border-top-right-radius: 6px;
+  border-bottom-right-radius: 6px;
+}
+
+.citizen-table td {
+  padding: 12px 12px;
+  border-bottom: 1px solid rgba(28, 42, 53, 0.6);
+  color: #B8C3CE;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.citizen-table tr:last-child td {
+  border-bottom: none;
+}
+
+.citizen-table tr:hover td {
+  background: rgba(20, 33, 44, 0.4);
+}
+
+.citizen-table-id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-weight: 500;
+  color: #F4F7FA;
+  font-size: 11.5px;
+}
+
+.citizen-category-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 500;
+  color: #F4F7FA;
+}
+
+.citizen-category-icon {
+  flex-shrink: 0;
+}
+
+.citizen-location-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #B8C3CE;
+}
+
+/* Status & Priority Pills */
+.citizen-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  border: 1px solid transparent;
+}
+
+.citizen-badge-pill.priority-critical {
+  background: rgba(240, 68, 56, 0.15);
+  border-color: rgba(240, 68, 56, 0.35);
+  color: #FCA5A5;
+}
+
+.citizen-badge-pill.priority-high {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.35);
+  color: #FCD34D;
+}
+
+.citizen-badge-pill.priority-medium {
+  background: rgba(250, 204, 21, 0.15);
+  border-color: rgba(250, 204, 21, 0.35);
+  color: #FEF08A;
+}
+
+.citizen-badge-pill.priority-low {
+  background: rgba(52, 211, 153, 0.15);
+  border-color: rgba(52, 211, 153, 0.35);
+  color: #6EE7B7;
+}
+
+.citizen-badge-pill.status-reported {
+  background: rgba(1, 174, 253, 0.14);
+  border-color: rgba(1, 174, 253, 0.35);
+  color: #7DD3FC;
+}
+
+.citizen-badge-pill.status-under-review {
+  background: rgba(245, 158, 11, 0.14);
+  border-color: rgba(245, 158, 11, 0.35);
+  color: #FCD34D;
+}
+
+.citizen-badge-pill.status-in-progress {
+  background: rgba(52, 211, 153, 0.14);
+  border-color: rgba(52, 211, 153, 0.35);
+  color: #34D399;
+}
+
+.citizen-badge-pill.status-resolved {
+  background: rgba(52, 211, 153, 0.14);
+  border-color: rgba(52, 211, 153, 0.35);
+  color: #34D399;
+}
+
+.citizen-view-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  color: #01AEFD;
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid #1C2A35;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+
+.citizen-view-action-btn:hover {
+  background: rgba(1, 174, 253, 0.1);
+  border-color: #01AEFD;
+  color: #22C7FF;
+}
+
+/* ── 5. Emergency Safety Information ────────────────────────────── */
+.citizen-safety-card {
+  background: #111C26;
+  border: 1px solid #1C2A35;
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+
+.citizen-safety-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-top: 10px;
+}
+
+@media (max-width: 860px) {
+  .citizen-safety-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.citizen-safety-item {
+  background: #0D151D;
+  border: 1px solid #1C2A35;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  transition: border-color 150ms ease;
+}
+
+.citizen-safety-item:hover {
+  border-color: #243442;
+}
+
+.citizen-safety-icon-tile {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.citizen-safety-icon-tile.cyan {
+  background: rgba(14, 165, 233, 0.15);
+  color: #0EA5E9;
+}
+
+.citizen-safety-icon-tile.blue {
+  background: rgba(1, 174, 253, 0.15);
+  color: #01AEFD;
+}
+
+.citizen-safety-icon-tile.teal {
+  background: rgba(34, 199, 255, 0.15);
+  color: #22C7FF;
+}
+
+.citizen-safety-icon-tile.green {
+  background: rgba(52, 211, 153, 0.15);
+  color: #34D399;
+}
+
+.citizen-safety-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.citizen-safety-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #F4F7FA;
+  margin-bottom: 2px;
+}
+
+.citizen-safety-desc {
+  font-size: 10.5px;
+  color: #8997A5;
+  line-height: 1.4;
+}
+
+/* ── 6. Sidebar: Live Incident Map Preview ───────────────────────── */
+.citizen-sidebar-card {
+  background: #111C26;
+  border: 1px solid #1C2A35;
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.citizen-sidebar-map-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  white-space: nowrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.citizen-map-preview-wrap {
+  width: 100%;
+  height: 240px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #1C2A35;
+  margin-top: 10px;
+  position: relative;
+  background: var(--bg, #0C1117);
+  cursor: pointer;
+}
+
+.citizen-map-leaflet-container {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+/* Map visual pins overlay */
+.citizen-map-pin {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+  z-index: 400;
+  transition: transform 150ms ease;
+}
+
+.citizen-map-pin:hover {
+  transform: translate(-50%, -50%) scale(1.15);
+}
+
+.citizen-map-label {
+  position: absolute;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: #D1D5DB;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+  pointer-events: none;
+  z-index: 401;
+}
+
+/* ── 7. Sidebar: Announcements ──────────────────────────────────── */
+.citizen-announcement-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.citizen-announcement-item {
+  background: #0D151D;
+  border: 1px solid #1C2A35;
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  position: relative;
+  transition: border-color 150ms ease;
+}
+
+.citizen-announcement-item:hover {
+  border-color: #243442;
+}
+
+.citizen-announcement-icon-tile {
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.citizen-announcement-icon-tile.amber {
+  background: rgba(245, 158, 11, 0.15);
+  color: #F59E0B;
+}
+
+.citizen-announcement-icon-tile.blue {
+  background: rgba(1, 174, 253, 0.15);
+  color: #01AEFD;
+}
+
+.citizen-announcement-icon-tile.green {
+  background: rgba(52, 211, 153, 0.15);
+  color: #34D399;
+}
+
+.citizen-announcement-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.citizen-announcement-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+.citizen-announcement-title {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #F4F7FA;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.citizen-announcement-time {
+  font-size: 9.5px;
+  color: #8997A5;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.citizen-announcement-desc {
+  font-size: 10.5px;
+  color: #8997A5;
+  line-height: 1.35;
+  margin: 0;
+}
+
+/* ── 8. Sidebar: Immediate Help (112) ────────────────────────────── */
+.citizen-help-card {
+  background: #111C26;
+  border: 1px solid #1C2A35;
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.citizen-help-box {
+  background: linear-gradient(135deg, rgba(240, 68, 56, 0.18) 0%, rgba(185, 28, 28, 0.22) 100%);
+  border: 1px solid rgba(240, 68, 56, 0.35);
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-decoration: none;
+  cursor: pointer;
+  margin-top: 10px;
+  transition: border-color 150ms ease, background-color 150ms ease, transform 150ms ease;
+}
+
+.citizen-help-box:hover {
+  border-color: #F04438;
+  background: linear-gradient(135deg, rgba(240, 68, 56, 0.25) 0%, rgba(185, 28, 28, 0.3) 100%);
+  transform: translateY(-1px);
+}
+
+.citizen-help-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.citizen-help-icon-wrap {
+  color: #F04438;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.citizen-help-number {
+  font-size: 24px;
+  font-weight: 800;
+  color: #FFFFFF;
+  line-height: 1;
+}
+
+.citizen-help-sub {
+  font-size: 10px;
+  color: #FCA5A5;
+  margin-top: 2px;
+}
+
+.citizen-help-chevron {
+  color: #FCA5A5;
+  flex-shrink: 0;
+}
+
+.citizen-help-disclaimer {
+  font-size: 10px;
+  color: #8997A5;
+  margin-top: 8px;
+  line-height: 1.35;
+}
+
+/* ── Modal & Detail Drawer ──────────────────────────────────────── */
+.citizen-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.citizen-modal-card {
+  background: #111C26;
+  border: 1px solid #243442;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 580px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
+  padding: 20px 24px;
+}
+
+.citizen-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #1C2A35;
+  padding-bottom: 14px;
+  margin-bottom: 16px;
+}
+
+.citizen-modal-close {
+  background: transparent;
+  border: none;
+  color: #8997A5;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.citizen-modal-close:hover {
+  color: #F4F7FA;
+  background: rgba(255, 255, 255, 0.08);
+}
