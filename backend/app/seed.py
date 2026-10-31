@@ -40,6 +40,11 @@ from app.models import (
     TeamStatusEnum,
     TeamTypeEnum,
     User,
+    Vehicle,
+    VehicleStatusEnum,
+    Supply,
+    SupplyCategoryEnum,
+    IncidentSupplyAllocation,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -58,9 +63,12 @@ async def seed_data():
 
     async with async_session() as db:
         logger.info("[SEED] Cleaning up existing records...")
+        await db.execute(delete(IncidentSupplyAllocation))
         await db.execute(delete(Notification))
         await db.execute(delete(StatusHistory))
         await db.execute(delete(Incident))
+        await db.execute(delete(Vehicle))
+        await db.execute(delete(Supply))
         await db.execute(delete(Place))
         await db.execute(delete(ResponseTeam))
         await db.execute(delete(Resource))
@@ -147,6 +155,8 @@ async def seed_data():
                 latitude=t["lat"],
                 longitude=t["lon"],
                 status=t["status"],
+                contact=t["contact"],
+                members_count=random.randint(6, 12),
             )
             db.add(r_team)
 
@@ -170,6 +180,7 @@ async def seed_data():
                 "lon": 73.8082,
                 "address": "Paud Road, near Vanaz Corner, Kothrud, Pune 411038",
                 "capacity": 250,
+                "current_occupancy": 110,
                 "available": True,
                 "contact": "+91 20 2543 8901",
             },
@@ -180,6 +191,7 @@ async def seed_data():
                 "lon": 73.7360,
                 "address": "Phase 1, Hinjawadi Rajiv Gandhi Infotech Park, Pune 411057",
                 "capacity": 400,
+                "current_occupancy": 240,
                 "available": True,
                 "contact": "+91 20 6674 1200",
             },
@@ -190,6 +202,7 @@ async def seed_data():
                 "lon": 73.7725,
                 "address": "Balewadi Stadium Road, near Baner, Pune 411045",
                 "capacity": 750,
+                "current_occupancy": 410,
                 "available": True,
                 "contact": "+91 20 2737 4000",
             },
@@ -200,6 +213,7 @@ async def seed_data():
                 "lon": 73.7650,
                 "address": "Datta Mandir Road, Wakad, Pimpri-Chinchwad, Pune 411057",
                 "capacity": 180,
+                "current_occupancy": 65,
                 "available": True,
                 "contact": "+91 20 2728 5511",
             },
@@ -210,6 +224,7 @@ async def seed_data():
                 "lon": 73.8020,
                 "address": "Parihar Chowk, DP Road, Aundh, Pune 411007",
                 "capacity": 220,
+                "current_occupancy": 95,
                 "available": True,
                 "contact": "+91 20 2588 3490",
             },
@@ -220,6 +235,7 @@ async def seed_data():
                 "lon": 73.8285,
                 "address": "Manik Baug, Sinhagad Road, Pune 411051",
                 "capacity": 350,
+                "current_occupancy": 180,
                 "available": True,
                 "contact": "+91 20 2435 6789",
             },
@@ -295,10 +311,44 @@ async def seed_data():
                 longitude=p["lon"],
                 address=p["address"],
                 capacity=p["capacity"],
+                current_occupancy=p.get("current_occupancy", 0),
                 available=p["available"],
                 contact=p["contact"],
             )
             db.add(place)
+
+        # ── 3b. Emergency Vehicles ────────────────────────────────────
+        logger.info("[SEED] Seeding Pune emergency response vehicles...")
+        vehicles_data = [
+            {"name": "Kothrud Heavy Fire Tender 1", "type": "fire_truck", "plate": "MH-12-FT-1011", "status": VehicleStatusEnum.available, "assigned_team_id": 1},
+            {"name": "NDRF Inflatable Flood Rescue Boat Alpha", "type": "boat", "plate": "MH-12-ND-5001", "status": VehicleStatusEnum.in_use, "assigned_team_id": 2},
+            {"name": "PMDA Rapid Intervention SUV 4x4", "type": "suv_4x4", "plate": "MH-12-PM-3001", "status": VehicleStatusEnum.available, "assigned_team_id": 3},
+            {"name": "PCMC High-Water Rescue Truck", "type": "supply_truck", "plate": "MH-14-PC-8822", "status": VehicleStatusEnum.available, "assigned_team_id": 4},
+            {"name": "Sassoon Mobile Trauma ICU Ambulance", "type": "ambulance", "plate": "MH-12-IC-9901", "status": VehicleStatusEnum.in_use, "assigned_team_id": 5},
+            {"name": "Sinhagad Road Inflatable Life Boat Beta", "type": "boat", "plate": "MH-12-SR-2201", "status": VehicleStatusEnum.available, "assigned_team_id": 6},
+            {"name": "Civil Defense Logistics & Supply Carrier", "type": "supply_truck", "plate": "MH-12-CD-4411", "status": VehicleStatusEnum.available, "assigned_team_id": 7},
+            {"name": "Maharashtra 108 Advanced Cardiac Ambulance", "type": "ambulance", "plate": "MH-12-EM-1081", "status": VehicleStatusEnum.in_use, "assigned_team_id": 8},
+            {"name": "PMC Backup Emergency Tender", "type": "fire_truck", "plate": "MH-12-BK-7700", "status": VehicleStatusEnum.maintenance, "assigned_team_id": None},
+        ]
+        for v in vehicles_data:
+            db.add(Vehicle(**v))
+
+        # ── 3c. Emergency Supplies ────────────────────────────────────
+        logger.info("[SEED] Seeding Pune disaster supplies...")
+        supplies_data = [
+            {"item": "Trauma Surgical First Aid Kits", "category": SupplyCategoryEnum.medical, "quantity": 140, "unit": "kits", "low_stock_threshold": 30, "location": "Swargate Relief Central Warehouse"},
+            {"item": "Emergency Drinking Water Pouches (500ml)", "category": SupplyCategoryEnum.water, "quantity": 2500, "unit": "pouches", "low_stock_threshold": 500, "location": "Kothrud PMC Depot"},
+            {"item": "Ready-to-Eat High Protein Meal Kits", "category": SupplyCategoryEnum.food, "quantity": 850, "unit": "packs", "low_stock_threshold": 200, "location": "Swargate Relief Central Warehouse"},
+            {"item": "Chlorine Water Purification Tablets", "category": SupplyCategoryEnum.water, "quantity": 18, "unit": "boxes", "low_stock_threshold": 25, "location": "PCMC Bhumkar Warehouse"},  # Low stock
+            {"item": "Heavy Duty Thermal Survival Blankets", "category": SupplyCategoryEnum.other, "quantity": 420, "unit": "blankets", "low_stock_threshold": 100, "location": "Balewadi Relief Camp"},
+            {"item": "Inflatable Rescue Life Jackets", "category": SupplyCategoryEnum.other, "quantity": 65, "unit": "vests", "low_stock_threshold": 50, "location": "Sinhagad Road Base"},
+            {"item": "Sterile Bandage Rolls & Gauze", "category": SupplyCategoryEnum.medical, "quantity": 12, "unit": "boxes", "low_stock_threshold": 20, "location": "Aundh District Hospital"},   # Low stock
+            {"item": "Portable Emergency Floodlights & Generators", "category": SupplyCategoryEnum.other, "quantity": 8, "unit": "units", "low_stock_threshold": 10, "location": "Kothrud PMC Depot"},  # Low stock
+            {"item": "Oral Rehydration Salts (ORS Sachets)", "category": SupplyCategoryEnum.medical, "quantity": 1200, "unit": "sachets", "low_stock_threshold": 300, "location": "Swargate Relief Central Warehouse"},
+            {"item": "Emergency Infant Food Formula", "category": SupplyCategoryEnum.food, "quantity": 15, "unit": "cases", "low_stock_threshold": 20, "location": "PCMC Bhumkar Warehouse"},      # Low stock
+        ]
+        for s in supplies_data:
+            db.add(Supply(**s))
 
         # ── 4. 25 Incidents across Pune Localities ───────────────────
         logger.info("[SEED] Seeding 25 realistic emergency incidents across Pune...")
@@ -763,5 +813,10 @@ async def seed_data():
 seed = seed_data
 
 
+async def _main():
+    await seed_data()
+    await engine.dispose()
+
+
 if __name__ == "__main__":
-    asyncio.run(seed_data())
+    asyncio.run(_main())

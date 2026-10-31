@@ -98,6 +98,19 @@ class ResourceTypeEnum(str, enum.Enum):
     vehicle = "vehicle"
 
 
+class VehicleStatusEnum(str, enum.Enum):
+    available = "available"
+    in_use = "in_use"
+    maintenance = "maintenance"
+
+
+class SupplyCategoryEnum(str, enum.Enum):
+    food = "food"
+    water = "water"
+    medical = "medical"
+    other = "other"
+
+
 # ── Core Models ───────────────────────────────────────────────
 
 class User(Base):
@@ -232,7 +245,7 @@ class Place(Base):
     """
     Places table:
     id, type (shelter|hospital|relief_supply), name, latitude, longitude,
-    address, capacity, available (bool), contact
+    address, capacity, current_occupancy, available (bool), contact
     """
     __tablename__ = "places"
 
@@ -243,6 +256,7 @@ class Place(Base):
     longitude = Column(Float, nullable=False)
     address = Column(String(300), nullable=False)
     capacity = Column(Integer, default=0, nullable=False)
+    current_occupancy = Column(Integer, default=0, nullable=False)
     available = Column(Boolean, default=True, nullable=False)
     contact = Column(String(100), nullable=True)
     created_at = Column(DateTime(timezone=True), default=_utcnow)
@@ -251,7 +265,8 @@ class Place(Base):
 class ResponseTeam(Base):
     """
     Response teams table:
-    id, name, latitude, longitude, status (available|busy)
+    id, name, latitude, longitude, status (available|busy),
+    contact, members_count, current_incident_id
     """
     __tablename__ = "response_teams"
 
@@ -260,7 +275,68 @@ class ResponseTeam(Base):
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
     status = Column(Enum(TeamStatusEnum, native_enum=False), default=TeamStatusEnum.available, nullable=False)
+    contact = Column(String(100), nullable=True)
+    members_count = Column(Integer, default=5, nullable=False)
+    current_incident_id = Column(Integer, ForeignKey("incidents.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime(timezone=True), default=_utcnow)
+
+    current_incident = relationship("Incident", foreign_keys=[current_incident_id])
+    vehicles = relationship("Vehicle", back_populates="assigned_team")
+
+
+class Vehicle(Base):
+    """
+    Vehicles table:
+    id, name, type, plate, status (available|in_use|maintenance),
+    assigned_team_id, current_incident_id, created_at
+    """
+    __tablename__ = "vehicles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(150), nullable=False)
+    type = Column(String(50), nullable=False)  # ambulance | fire_truck | boat | supply_truck | suv_4x4
+    plate = Column(String(50), unique=True, index=True, nullable=False)
+    status = Column(Enum(VehicleStatusEnum, native_enum=False), default=VehicleStatusEnum.available, nullable=False)
+    assigned_team_id = Column(Integer, ForeignKey("response_teams.id", ondelete="SET NULL"), nullable=True)
+    current_incident_id = Column(Integer, ForeignKey("incidents.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=_utcnow)
+
+    assigned_team = relationship("ResponseTeam", back_populates="vehicles")
+    current_incident = relationship("Incident", foreign_keys=[current_incident_id])
+
+
+class Supply(Base):
+    """
+    Supplies table:
+    id, item, category (food|water|medical|other), quantity, unit,
+    low_stock_threshold, location, created_at
+    """
+    __tablename__ = "supplies"
+
+    id = Column(Integer, primary_key=True, index=True)
+    item = Column(String(150), nullable=False)
+    category = Column(Enum(SupplyCategoryEnum, native_enum=False), default=SupplyCategoryEnum.other, nullable=False)
+    quantity = Column(Integer, default=0, nullable=False)
+    unit = Column(String(50), default="units", nullable=False)
+    low_stock_threshold = Column(Integer, default=10, nullable=False)
+    location = Column(String(200), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=_utcnow)
+
+
+class IncidentSupplyAllocation(Base):
+    """
+    Tracks supplies allocated to incidents.
+    """
+    __tablename__ = "incident_supply_allocations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    incident_id = Column(Integer, ForeignKey("incidents.id", ondelete="CASCADE"), nullable=False, index=True)
+    supply_id = Column(Integer, ForeignKey("supplies.id", ondelete="CASCADE"), nullable=False, index=True)
+    quantity = Column(Integer, default=1, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=_utcnow)
+
+    incident = relationship("Incident")
+    supply = relationship("Supply")
 
 
 # ── Auxiliary / Compatibility Models ──────────────────────────

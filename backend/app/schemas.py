@@ -250,6 +250,7 @@ class PlaceCreate(BaseModel):
     longitude: float
     address: str = Field(..., min_length=3, max_length=300)
     capacity: int = Field(default=0, ge=0)
+    current_occupancy: int = Field(default=0, ge=0)
     available: bool = True
     contact: Optional[str] = Field(default=None, max_length=100)
 
@@ -263,6 +264,7 @@ class PlaceOut(BaseModel):
     longitude: float
     address: str
     capacity: int
+    current_occupancy: int = 0
     available: bool
     contact: Optional[str] = None
     created_at: Optional[datetime] = None
@@ -388,6 +390,7 @@ class NearbyShelterOut(BaseModel):
     latitude: float
     longitude: float
     capacity: int
+    current_occupancy: int = 0
     available: bool
     contact: Optional[str] = None
     distance_km: float
@@ -584,3 +587,211 @@ class AdminMapResponse(BaseModel):
     total_supplies: int
     total_teams: int
     total_zones: int
+
+
+# ── Admin Resources & Teams ───────────────────────────────────
+
+class ResourcesSummaryOut(BaseModel):
+    available_teams: int
+    vehicles_in_use: int
+    low_stock_items: int
+    free_shelter_beds: int
+    total_teams: int
+    total_vehicles: int
+    total_supplies: int
+    total_shelters: int
+
+
+class AdminResponseTeamCreate(BaseModel):
+    name: str = Field(..., min_length=2, max_length=150)
+    contact: Optional[str] = Field(default=None, max_length=100)
+    members_count: int = Field(default=5, ge=1, le=100)
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    status: str = Field(default="available", pattern=r"^(available|busy)$")
+
+
+class AdminResponseTeamUpdate(BaseModel):
+    name: str = Field(..., min_length=2, max_length=150)
+    contact: Optional[str] = Field(default=None, max_length=100)
+    members_count: int = Field(default=5, ge=1, le=100)
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    status: str = Field(default="available", pattern=r"^(available|busy)$")
+
+
+class AdminResponseTeamPatch(BaseModel):
+    status: Optional[str] = Field(default=None, pattern=r"^(available|busy)$")
+    contact: Optional[str] = None
+    members_count: Optional[int] = Field(default=None, ge=1)
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+
+class AdminResponseTeamOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    name: str
+    contact: Optional[str] = None
+    members_count: int = 5
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    status: str
+    current_incident_id: Optional[int] = None
+    current_incident_code: Optional[str] = None
+    created_at: Optional[datetime] = None
+    assigned_vehicle_count: int = 0
+
+
+# ── Vehicles ──────────────────────────────────────────────────
+
+class VehicleCreate(BaseModel):
+    name: str = Field(..., min_length=2, max_length=150)
+    type: str = Field(..., min_length=2, max_length=50)
+    plate: str = Field(..., min_length=3, max_length=50)
+    status: str = Field(default="available", pattern=r"^(available|in_use|maintenance)$")
+    assigned_team_id: Optional[int] = None
+
+
+class VehicleUpdate(BaseModel):
+    name: str = Field(..., min_length=2, max_length=150)
+    type: str = Field(..., min_length=2, max_length=50)
+    plate: str = Field(..., min_length=3, max_length=50)
+    status: str = Field(default="available", pattern=r"^(available|in_use|maintenance)$")
+    assigned_team_id: Optional[int] = None
+
+
+class VehiclePatch(BaseModel):
+    status: Optional[str] = Field(default=None, pattern=r"^(available|in_use|maintenance)$")
+    assigned_team_id: Optional[int] = None
+    current_incident_id: Optional[int] = None
+
+
+class VehicleOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    name: str
+    type: str
+    plate: str
+    status: str
+    assigned_team_id: Optional[int] = None
+    assigned_team_name: Optional[str] = None
+    current_incident_id: Optional[int] = None
+    current_incident_code: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+
+# ── Supplies ──────────────────────────────────────────────────
+
+class SupplyCreate(BaseModel):
+    item: str = Field(..., min_length=2, max_length=150)
+    category: str = Field(..., pattern=r"^(food|water|medical|other)$")
+    quantity: int = Field(default=0, ge=0)
+    unit: str = Field(default="units", min_length=1, max_length=50)
+    low_stock_threshold: int = Field(default=10, ge=0)
+    location: str = Field(..., min_length=2, max_length=200)
+
+
+class SupplyUpdate(BaseModel):
+    item: str = Field(..., min_length=2, max_length=150)
+    category: str = Field(..., pattern=r"^(food|water|medical|other)$")
+    quantity: int = Field(..., ge=0)
+    unit: str = Field(default="units", min_length=1, max_length=50)
+    low_stock_threshold: int = Field(default=10, ge=0)
+    location: str = Field(..., min_length=2, max_length=200)
+
+
+class SupplyPatch(BaseModel):
+    quantity: Optional[int] = Field(default=None, ge=0)
+    delta: Optional[int] = None
+    low_stock_threshold: Optional[int] = Field(default=None, ge=0)
+
+
+class SupplyOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    item: str
+    category: str
+    quantity: int
+    unit: str
+    low_stock_threshold: int
+    location: str
+    is_low_stock: bool = False
+    created_at: Optional[datetime] = None
+
+
+# ── Shelters ──────────────────────────────────────────────────
+
+class ShelterCreate(BaseModel):
+    name: str = Field(..., min_length=2, max_length=200)
+    address: str = Field(..., min_length=3, max_length=300)
+    latitude: float
+    longitude: float
+    capacity: int = Field(default=100, ge=1)
+    current_occupancy: int = Field(default=0, ge=0)
+    available: bool = True
+    contact: Optional[str] = Field(default=None, max_length=100)
+
+
+class ShelterUpdate(BaseModel):
+    name: str = Field(..., min_length=2, max_length=200)
+    address: str = Field(..., min_length=3, max_length=300)
+    latitude: float
+    longitude: float
+    capacity: int = Field(..., ge=1)
+    current_occupancy: int = Field(..., ge=0)
+    available: bool = True
+    contact: Optional[str] = Field(default=None, max_length=100)
+
+
+class ShelterPatch(BaseModel):
+    current_occupancy: Optional[int] = Field(default=None, ge=0)
+    delta_occupancy: Optional[int] = None
+    capacity: Optional[int] = Field(default=None, ge=1)
+    available: Optional[bool] = None
+    contact: Optional[str] = None
+
+
+class ShelterOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    name: str
+    address: str
+    latitude: float
+    longitude: float
+    capacity: int
+    current_occupancy: int
+    available: bool
+    contact: Optional[str] = None
+    free_beds: int = 0
+    occupancy_pct: float = 0.0
+    created_at: Optional[datetime] = None
+
+
+# ── Incident Resource Allocation & Release ────────────────────
+
+class SupplyAllocationItem(BaseModel):
+    supply_id: int
+    quantity: int = Field(..., ge=1)
+
+
+class IncidentAssignResourcesRequest(BaseModel):
+    team_id: Optional[int] = None
+    vehicle_ids: Optional[List[int]] = []
+    supplies: Optional[List[SupplyAllocationItem]] = []
+
+
+class IncidentAssignResourcesResponse(BaseModel):
+    incident_id: int
+    incident_status: str
+    assigned_team_id: Optional[int] = None
+    assigned_vehicle_ids: List[int] = []
+    allocated_supplies: List[Dict[str, Any]] = []
+    message: str
+
+
+class IncidentReleaseResourcesResponse(BaseModel):
+    incident_id: int
+    freed_teams: int
+    freed_vehicles: int
+    message: str

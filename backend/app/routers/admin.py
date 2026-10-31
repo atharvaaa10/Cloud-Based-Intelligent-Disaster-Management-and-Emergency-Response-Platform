@@ -27,6 +27,12 @@ from app.models import (
     Place,
     PlaceTypeEnum,
     ResponseTeam,
+    TeamStatusEnum,
+    Vehicle,
+    VehicleStatusEnum,
+    Supply,
+    SupplyCategoryEnum,
+    IncidentSupplyAllocation,
 )
 from app.schemas import (
     AuditLogListResponse,
@@ -46,6 +52,26 @@ from app.schemas import (
     AdminIncidentMarker,
     AdminTeamMarker,
     AdminMapResponse,
+    ResourcesSummaryOut,
+    AdminResponseTeamCreate,
+    AdminResponseTeamUpdate,
+    AdminResponseTeamPatch,
+    AdminResponseTeamOut,
+    VehicleCreate,
+    VehicleUpdate,
+    VehiclePatch,
+    VehicleOut,
+    SupplyCreate,
+    SupplyUpdate,
+    SupplyPatch,
+    SupplyOut,
+    ShelterCreate,
+    ShelterUpdate,
+    ShelterPatch,
+    ShelterOut,
+    IncidentAssignResourcesRequest,
+    IncidentAssignResourcesResponse,
+    IncidentReleaseResourcesResponse,
 )
 from app.audit import record_audit_event
 from app.services.notification_service import NotificationService
@@ -890,4 +916,1151 @@ async def get_admin_map_data(
         total_supplies=len(supplies),
         total_teams=len(teams_out),
         total_zones=len(filtered_zones),
+    )
+
+
+# ════════════════════════════════════════════════════════════════════
+# ── Admin Resource Management (/admin/resources/*) ─────────────────
+# ════════════════════════════════════════════════════════════════════
+
+@router.get("/resources/summary", response_model=ResourcesSummaryOut)
+async def get_resources_summary(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    """
+    Returns summary metrics for the resource strip:
+    available teams, vehicles in use, low-stock items, free shelter beds.
+    """
+    res_teams = await db.execute(
+        select(func.count(ResponseTeam.id)).where(ResponseTeam.status == TeamStatusEnum.available)
+    )
+    available_teams = res_teams.scalar() or 0
+
+    res_all_teams = await db.execute(select(func.count(ResponseTeam.id)))
+    total_teams = res_all_teams.scalar() or 0
+
+    res_veh_use = await db.execute(
+        select(func.count(Vehicle.id)).where(Vehicle.status == VehicleStatusEnum.in_use)
+    )
+    vehicles_in_use = res_veh_use.scalar() or 0
+
+    res_all_veh = await db.execute(select(func.count(Vehicle.id)))
+    total_vehicles = res_all_veh.scalar() or 0
+
+    res_low_stock = await db.execute(
+        select(func.count(Supply.id)).where(Supply.quantity <= Supply.low_stock_threshold)
+    )
+    low_stock_items = res_low_stock.scalar() or 0
+
+    res_all_supplies = await db.execute(select(func.count(Supply.id)))
+    total_supplies = res_all_supplies.scalar() or 0
+
+    shelters_res = await db.execute(
+        select(Place).where(Place.type == PlaceTypeEnum.shelter)
+    )
+    all_shelters = shelters_res.scalars().all()
+    free_beds = sum(max(0, s.capacity - s.current_occupancy) for s in all_shelters)
+    total_shelters = len(all_shelters)
+
+    return ResourcesSummaryOut(
+        available_teams=available_teams,
+        vehicles_in_use=vehicles_in_use,
+        low_stock_items=low_stock_items,
+        free_shelter_beds=free_beds,
+        total_teams=total_teams,
+        total_vehicles=total_vehicles,
+        total_supplies=total_supplies,
+        total_shelters=total_shelters,
+    )
+
+
+# ── Teams CRUD & Patch ─────────────────────────────────────────────
+
+@router.get("/resources/teams", response_model=List[AdminResponseTeamOut])
+async def list_admin_teams(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    stmt = (
+        select(ResponseTeam)
+        .options(selectinload(ResponseTeam.current_incident), selectinload(ResponseTeam.vehicles))
+        .order_by(ResponseTeam.name.asc())
+    )
+    res = await db.execute(stmt)
+    teams = res.scalars().all()
+
+    out = []
+    for t in teams:
+        inc_code = t.current_incident.public_code if t.current_incident else None
+        out.append(
+            AdminResponseTeamOut(
+                id=t.id,
+                name=t.name,
+                contact=t.contact,
+                members_count=t.members_count,
+                latitude=t.latitude,
+                longitude=t.longitude,
+                status=t.status.value if hasattr(t.status, "value") else str(t.status),
+                current_incident_id=t.current_incident_id,
+                current_incident_code=inc_code,
+                created_at=t.created_at,
+                assigned_vehicle_count=len(t.vehicles) if t.vehicles else 0,
+            )
+        )
+    return out
+
+
+@router.post("/resources/teams", response_model=AdminResponseTeamOut, status_code=http_status.HTTP_201_CREATED)
+async def create_admin_team(
+    body: AdminResponseTeamCreate,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    team = ResponseTeam(
+        name=body.name.strip(),
+        contact=body.contact.strip() if body.contact else None,
+        members_count=body.members_count,
+        latitude=body.latitude,
+        longitude=body.longitude,
+        status=TeamStatusEnum(body.status),
+    )
+    db.add(team)
+    await db.commit()
+    await db.refresh(team)
+
+    await record_audit_event(
+        db,
+        action="team.created",
+        actor_id=current_user.id,
+        actor_role=current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role),
+        entity_type="response_team",
+        entity_id=team.id,
+        details={"name": team.name, "members_count": team.members_count, "status": team.status.value},
+        ip_address=request.client.host if request.client else None,
+    )
+    await db.commit()
+
+    return AdminResponseTeamOut(
+        id=team.id,
+        name=team.name,
+        contact=team.contact,
+        members_count=team.members_count,
+        latitude=team.latitude,
+        longitude=team.longitude,
+        status=team.status.value,
+        current_incident_id=team.current_incident_id,
+        current_incident_code=None,
+        created_at=team.created_at,
+        assigned_vehicle_count=0,
+    )
+
+
+@router.get("/resources/teams/{id}", response_model=AdminResponseTeamOut)
+async def get_admin_team(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    stmt = (
+        select(ResponseTeam)
+        .options(selectinload(ResponseTeam.current_incident), selectinload(ResponseTeam.vehicles))
+        .where(ResponseTeam.id == id)
+    )
+    res = await db.execute(stmt)
+    t = res.scalar_one_or_none()
+    if not t:
+        raise HTTPException(status_code=404, detail="Team not found")
+
+    inc_code = t.current_incident.public_code if t.current_incident else None
+    return AdminResponseTeamOut(
+        id=t.id,
+        name=t.name,
+        contact=t.contact,
+        members_count=t.members_count,
+        latitude=t.latitude,
+        longitude=t.longitude,
+        status=t.status.value if hasattr(t.status, "value") else str(t.status),
+        current_incident_id=t.current_incident_id,
+        current_incident_code=inc_code,
+        created_at=t.created_at,
+        assigned_vehicle_count=len(t.vehicles) if t.vehicles else 0,
+    )
+
+
+@router.put("/resources/teams/{id}", response_model=AdminResponseTeamOut)
+async def update_admin_team(
+    id: int,
+    body: AdminResponseTeamUpdate,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    stmt = select(ResponseTeam).where(ResponseTeam.id == id)
+    res = await db.execute(stmt)
+    team = res.scalar_one_or_none()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+
+    old_data = {"name": team.name, "contact": team.contact, "members_count": team.members_count, "status": team.status.value}
+    team.name = body.name.strip()
+    team.contact = body.contact.strip() if body.contact else None
+    team.members_count = body.members_count
+    if body.latitude is not None:
+        team.latitude = body.latitude
+    if body.longitude is not None:
+        team.longitude = body.longitude
+    team.status = TeamStatusEnum(body.status)
+
+    await record_audit_event(
+        db,
+        action="team.updated",
+        actor_id=current_user.id,
+        actor_role=current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role),
+        entity_type="response_team",
+        entity_id=team.id,
+        details={"old": old_data, "new": {"name": team.name, "contact": team.contact, "members_count": team.members_count, "status": team.status.value}},
+        ip_address=request.client.host if request.client else None,
+    )
+    await db.commit()
+    await db.refresh(team)
+
+    return await get_admin_team(id=team.id, db=db, current_user=current_user)
+
+
+@router.patch("/resources/teams/{id}", response_model=AdminResponseTeamOut)
+async def patch_admin_team(
+    id: int,
+    body: AdminResponseTeamPatch,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    stmt = select(ResponseTeam).where(ResponseTeam.id == id)
+    res = await db.execute(stmt)
+    team = res.scalar_one_or_none()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+
+    changes = {}
+    if body.status is not None:
+        changes["status"] = {"old": team.status.value, "new": body.status}
+        team.status = TeamStatusEnum(body.status)
+        if body.status == "available":
+            team.current_incident_id = None
+    if body.contact is not None:
+        team.contact = body.contact.strip() or None
+        changes["contact"] = team.contact
+    if body.members_count is not None:
+        team.members_count = body.members_count
+        changes["members_count"] = team.members_count
+    if body.latitude is not None:
+        team.latitude = body.latitude
+    if body.longitude is not None:
+        team.longitude = body.longitude
+
+    await record_audit_event(
+        db,
+        action="team.patched",
+        actor_id=current_user.id,
+        actor_role=current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role),
+        entity_type="response_team",
+        entity_id=team.id,
+        details=changes,
+        ip_address=request.client.host if request.client else None,
+    )
+    await db.commit()
+    return await get_admin_team(id=team.id, db=db, current_user=current_user)
+
+
+@router.delete("/resources/teams/{id}")
+async def delete_admin_team(
+    id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    stmt = select(ResponseTeam).where(ResponseTeam.id == id)
+    res = await db.execute(stmt)
+    team = res.scalar_one_or_none()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+
+    name = team.name
+    await db.delete(team)
+    await record_audit_event(
+        db,
+        action="team.deleted",
+        actor_id=current_user.id,
+        actor_role=current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role),
+        entity_type="response_team",
+        entity_id=id,
+        details={"name": name},
+        ip_address=request.client.host if request.client else None,
+    )
+    await db.commit()
+    return {"message": f"Team '{name}' deleted successfully", "id": id}
+
+
+# ── Vehicles CRUD & Patch ──────────────────────────────────────────
+
+@router.get("/resources/vehicles", response_model=List[VehicleOut])
+async def list_admin_vehicles(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    stmt = (
+        select(Vehicle)
+        .options(selectinload(Vehicle.assigned_team), selectinload(Vehicle.current_incident))
+        .order_by(Vehicle.name.asc())
+    )
+    res = await db.execute(stmt)
+    vehicles = res.scalars().all()
+
+    out = []
+    for v in vehicles:
+        team_name = v.assigned_team.name if v.assigned_team else None
+        inc_code = v.current_incident.public_code if v.current_incident else None
+        out.append(
+            VehicleOut(
+                id=v.id,
+                name=v.name,
+                type=v.type,
+                plate=v.plate,
+                status=v.status.value if hasattr(v.status, "value") else str(v.status),
+                assigned_team_id=v.assigned_team_id,
+                assigned_team_name=team_name,
+                current_incident_id=v.current_incident_id,
+                current_incident_code=inc_code,
+                created_at=v.created_at,
+            )
+        )
+    return out
+
+
+@router.post("/resources/vehicles", response_model=VehicleOut, status_code=http_status.HTTP_201_CREATED)
+async def create_admin_vehicle(
+    body: VehicleCreate,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    existing = await db.execute(select(Vehicle).where(Vehicle.plate == body.plate.strip().upper()))
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="A vehicle with this license plate already exists")
+
+    veh = Vehicle(
+        name=body.name.strip(),
+        type=body.type.strip(),
+        plate=body.plate.strip().upper(),
+        status=VehicleStatusEnum(body.status),
+        assigned_team_id=body.assigned_team_id,
+    )
+    db.add(veh)
+    await db.commit()
+    await db.refresh(veh)
+
+    await record_audit_event(
+        db,
+        action="vehicle.created",
+        actor_id=current_user.id,
+        actor_role=current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role),
+        entity_type="vehicle",
+        entity_id=veh.id,
+        details={"name": veh.name, "plate": veh.plate, "type": veh.type, "status": veh.status.value},
+        ip_address=request.client.host if request.client else None,
+    )
+    await db.commit()
+
+    return await get_admin_vehicle(id=veh.id, db=db, current_user=current_user)
+
+
+@router.get("/resources/vehicles/{id}", response_model=VehicleOut)
+async def get_admin_vehicle(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    stmt = (
+        select(Vehicle)
+        .options(selectinload(Vehicle.assigned_team), selectinload(Vehicle.current_incident))
+        .where(Vehicle.id == id)
+    )
+    res = await db.execute(stmt)
+    v = res.scalar_one_or_none()
+    if not v:
+        raise HTTPException(status_code=404, detail="Vehicle not found")
+
+    team_name = v.assigned_team.name if v.assigned_team else None
+    inc_code = v.current_incident.public_code if v.current_incident else None
+    return VehicleOut(
+        id=v.id,
+        name=v.name,
+        type=v.type,
+        plate=v.plate,
+        status=v.status.value if hasattr(v.status, "value") else str(v.status),
+        assigned_team_id=v.assigned_team_id,
+        assigned_team_name=team_name,
+        current_incident_id=v.current_incident_id,
+        current_incident_code=inc_code,
+        created_at=v.created_at,
+    )
+
+
+@router.put("/resources/vehicles/{id}", response_model=VehicleOut)
+async def update_admin_vehicle(
+    id: int,
+    body: VehicleUpdate,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    stmt = select(Vehicle).where(Vehicle.id == id)
+    res = await db.execute(stmt)
+    veh = res.scalar_one_or_none()
+    if not veh:
+        raise HTTPException(status_code=404, detail="Vehicle not found")
+
+    clean_plate = body.plate.strip().upper()
+    if clean_plate != veh.plate:
+        dup = await db.execute(select(Vehicle).where(Vehicle.plate == clean_plate, Vehicle.id != id))
+        if dup.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="A vehicle with this license plate already exists")
+
+    old_data = {"name": veh.name, "plate": veh.plate, "status": veh.status.value, "assigned_team_id": veh.assigned_team_id}
+    veh.name = body.name.strip()
+    veh.type = body.type.strip()
+    veh.plate = clean_plate
+    veh.status = VehicleStatusEnum(body.status)
+    veh.assigned_team_id = body.assigned_team_id
+
+    await record_audit_event(
+        db,
+        action="vehicle.updated",
+        actor_id=current_user.id,
+        actor_role=current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role),
+        entity_type="vehicle",
+        entity_id=veh.id,
+        details={"old": old_data, "new": {"name": veh.name, "plate": veh.plate, "status": veh.status.value, "assigned_team_id": veh.assigned_team_id}},
+        ip_address=request.client.host if request.client else None,
+    )
+    await db.commit()
+    return await get_admin_vehicle(id=veh.id, db=db, current_user=current_user)
+
+
+@router.patch("/resources/vehicles/{id}", response_model=VehicleOut)
+async def patch_admin_vehicle(
+    id: int,
+    body: VehiclePatch,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    stmt = select(Vehicle).where(Vehicle.id == id)
+    res = await db.execute(stmt)
+    veh = res.scalar_one_or_none()
+    if not veh:
+        raise HTTPException(status_code=404, detail="Vehicle not found")
+
+    changes = {}
+    if body.status is not None:
+        changes["status"] = {"old": veh.status.value, "new": body.status}
+        veh.status = VehicleStatusEnum(body.status)
+        if body.status == "available":
+            veh.current_incident_id = None
+    if "assigned_team_id" in body.model_fields_set:
+        changes["assigned_team_id"] = body.assigned_team_id
+        veh.assigned_team_id = body.assigned_team_id
+    if "current_incident_id" in body.model_fields_set:
+        changes["current_incident_id"] = body.current_incident_id
+        veh.current_incident_id = body.current_incident_id
+
+    await record_audit_event(
+        db,
+        action="vehicle.patched",
+        actor_id=current_user.id,
+        actor_role=current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role),
+        entity_type="vehicle",
+        entity_id=veh.id,
+        details=changes,
+        ip_address=request.client.host if request.client else None,
+    )
+    await db.commit()
+    return await get_admin_vehicle(id=veh.id, db=db, current_user=current_user)
+
+
+@router.delete("/resources/vehicles/{id}")
+async def delete_admin_vehicle(
+    id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    stmt = select(Vehicle).where(Vehicle.id == id)
+    res = await db.execute(stmt)
+    veh = res.scalar_one_or_none()
+    if not veh:
+        raise HTTPException(status_code=404, detail="Vehicle not found")
+
+    name = veh.name
+    await db.delete(veh)
+    await record_audit_event(
+        db,
+        action="vehicle.deleted",
+        actor_id=current_user.id,
+        actor_role=current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role),
+        entity_type="vehicle",
+        entity_id=id,
+        details={"name": name, "plate": veh.plate},
+        ip_address=request.client.host if request.client else None,
+    )
+    await db.commit()
+    return {"message": f"Vehicle '{name}' deleted successfully", "id": id}
+
+
+# ── Supplies CRUD & Patch ──────────────────────────────────────────
+
+@router.get("/resources/supplies", response_model=List[SupplyOut])
+async def list_admin_supplies(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    stmt = select(Supply).order_by(Supply.category.asc(), Supply.item.asc())
+    res = await db.execute(stmt)
+    supplies = res.scalars().all()
+
+    out = []
+    for s in supplies:
+        cat_str = s.category.value if hasattr(s.category, "value") else str(s.category)
+        out.append(
+            SupplyOut(
+                id=s.id,
+                item=s.item,
+                category=cat_str,
+                quantity=s.quantity,
+                unit=s.unit,
+                low_stock_threshold=s.low_stock_threshold,
+                location=s.location,
+                is_low_stock=(s.quantity <= s.low_stock_threshold),
+                created_at=s.created_at,
+            )
+        )
+    return out
+
+
+@router.post("/resources/supplies", response_model=SupplyOut, status_code=http_status.HTTP_201_CREATED)
+async def create_admin_supply(
+    body: SupplyCreate,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    supply = Supply(
+        item=body.item.strip(),
+        category=SupplyCategoryEnum(body.category),
+        quantity=body.quantity,
+        unit=body.unit.strip(),
+        low_stock_threshold=body.low_stock_threshold,
+        location=body.location.strip(),
+    )
+    db.add(supply)
+    await db.commit()
+    await db.refresh(supply)
+
+    await record_audit_event(
+        db,
+        action="supply.created",
+        actor_id=current_user.id,
+        actor_role=current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role),
+        entity_type="supply",
+        entity_id=supply.id,
+        details={"item": supply.item, "quantity": supply.quantity, "category": supply.category.value},
+        ip_address=request.client.host if request.client else None,
+    )
+    await db.commit()
+
+    return SupplyOut(
+        id=supply.id,
+        item=supply.item,
+        category=supply.category.value,
+        quantity=supply.quantity,
+        unit=supply.unit,
+        low_stock_threshold=supply.low_stock_threshold,
+        location=supply.location,
+        is_low_stock=(supply.quantity <= supply.low_stock_threshold),
+        created_at=supply.created_at,
+    )
+
+
+@router.get("/resources/supplies/{id}", response_model=SupplyOut)
+async def get_admin_supply(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    stmt = select(Supply).where(Supply.id == id)
+    res = await db.execute(stmt)
+    s = res.scalar_one_or_none()
+    if not s:
+        raise HTTPException(status_code=404, detail="Supply item not found")
+
+    cat_str = s.category.value if hasattr(s.category, "value") else str(s.category)
+    return SupplyOut(
+        id=s.id,
+        item=s.item,
+        category=cat_str,
+        quantity=s.quantity,
+        unit=s.unit,
+        low_stock_threshold=s.low_stock_threshold,
+        location=s.location,
+        is_low_stock=(s.quantity <= s.low_stock_threshold),
+        created_at=s.created_at,
+    )
+
+
+@router.put("/resources/supplies/{id}", response_model=SupplyOut)
+async def update_admin_supply(
+    id: int,
+    body: SupplyUpdate,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    stmt = select(Supply).where(Supply.id == id)
+    res = await db.execute(stmt)
+    s = res.scalar_one_or_none()
+    if not s:
+        raise HTTPException(status_code=404, detail="Supply item not found")
+
+    old_data = {"item": s.item, "quantity": s.quantity, "category": s.category.value, "location": s.location}
+    s.item = body.item.strip()
+    s.category = SupplyCategoryEnum(body.category)
+    s.quantity = body.quantity
+    s.unit = body.unit.strip()
+    s.low_stock_threshold = body.low_stock_threshold
+    s.location = body.location.strip()
+
+    await record_audit_event(
+        db,
+        action="supply.updated",
+        actor_id=current_user.id,
+        actor_role=current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role),
+        entity_type="supply",
+        entity_id=s.id,
+        details={"old": old_data, "new": {"item": s.item, "quantity": s.quantity, "category": s.category.value}},
+        ip_address=request.client.host if request.client else None,
+    )
+    await db.commit()
+    await db.refresh(s)
+
+    return await get_admin_supply(id=s.id, db=db, current_user=current_user)
+
+
+@router.patch("/resources/supplies/{id}", response_model=SupplyOut)
+async def patch_admin_supply(
+    id: int,
+    body: SupplyPatch,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    stmt = select(Supply).where(Supply.id == id)
+    res = await db.execute(stmt)
+    s = res.scalar_one_or_none()
+    if not s:
+        raise HTTPException(status_code=404, detail="Supply item not found")
+
+    changes = {}
+    old_qty = s.quantity
+    if body.quantity is not None:
+        s.quantity = max(0, body.quantity)
+        changes["quantity"] = {"old": old_qty, "new": s.quantity}
+    elif body.delta is not None:
+        s.quantity = max(0, s.quantity + body.delta)
+        changes["quantity"] = {"old": old_qty, "new": s.quantity, "delta": body.delta}
+
+    if body.low_stock_threshold is not None:
+        changes["low_stock_threshold"] = body.low_stock_threshold
+        s.low_stock_threshold = body.low_stock_threshold
+
+    await record_audit_event(
+        db,
+        action="supply.patched",
+        actor_id=current_user.id,
+        actor_role=current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role),
+        entity_type="supply",
+        entity_id=s.id,
+        details=changes,
+        ip_address=request.client.host if request.client else None,
+    )
+    await db.commit()
+    return await get_admin_supply(id=s.id, db=db, current_user=current_user)
+
+
+@router.delete("/resources/supplies/{id}")
+async def delete_admin_supply(
+    id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    stmt = select(Supply).where(Supply.id == id)
+    res = await db.execute(stmt)
+    s = res.scalar_one_or_none()
+    if not s:
+        raise HTTPException(status_code=404, detail="Supply item not found")
+
+    item_name = s.item
+    await db.delete(s)
+    await record_audit_event(
+        db,
+        action="supply.deleted",
+        actor_id=current_user.id,
+        actor_role=current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role),
+        entity_type="supply",
+        entity_id=id,
+        details={"item": item_name},
+        ip_address=request.client.host if request.client else None,
+    )
+    await db.commit()
+    return {"message": f"Supply item '{item_name}' deleted successfully", "id": id}
+
+
+# ── Shelters CRUD & Patch ──────────────────────────────────────────
+
+@router.get("/resources/shelters", response_model=List[ShelterOut])
+async def list_admin_shelters(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    stmt = select(Place).where(Place.type == PlaceTypeEnum.shelter).order_by(Place.name.asc())
+    res = await db.execute(stmt)
+    shelters = res.scalars().all()
+
+    out = []
+    for s in shelters:
+        cap = s.capacity or 1
+        occ = s.current_occupancy or 0
+        free = max(0, cap - occ)
+        pct = round(min(100.0, (occ / cap) * 100), 1)
+        out.append(
+            ShelterOut(
+                id=s.id,
+                name=s.name,
+                address=s.address,
+                latitude=s.latitude,
+                longitude=s.longitude,
+                capacity=s.capacity,
+                current_occupancy=occ,
+                available=s.available,
+                contact=s.contact,
+                free_beds=free,
+                occupancy_pct=pct,
+                created_at=s.created_at,
+            )
+        )
+    return out
+
+
+@router.post("/resources/shelters", response_model=ShelterOut, status_code=http_status.HTTP_201_CREATED)
+async def create_admin_shelter(
+    body: ShelterCreate,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    shelter = Place(
+        type=PlaceTypeEnum.shelter,
+        name=body.name.strip(),
+        address=body.address.strip(),
+        latitude=body.latitude,
+        longitude=body.longitude,
+        capacity=body.capacity,
+        current_occupancy=body.current_occupancy,
+        available=body.available,
+        contact=body.contact.strip() if body.contact else None,
+    )
+    db.add(shelter)
+    await db.commit()
+    await db.refresh(shelter)
+
+    await record_audit_event(
+        db,
+        action="shelter.created",
+        actor_id=current_user.id,
+        actor_role=current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role),
+        entity_type="shelter",
+        entity_id=shelter.id,
+        details={"name": shelter.name, "capacity": shelter.capacity, "occupancy": shelter.current_occupancy},
+        ip_address=request.client.host if request.client else None,
+    )
+    await db.commit()
+
+    cap = shelter.capacity or 1
+    occ = shelter.current_occupancy or 0
+    return ShelterOut(
+        id=shelter.id,
+        name=shelter.name,
+        address=shelter.address,
+        latitude=shelter.latitude,
+        longitude=shelter.longitude,
+        capacity=shelter.capacity,
+        current_occupancy=occ,
+        available=shelter.available,
+        contact=shelter.contact,
+        free_beds=max(0, cap - occ),
+        occupancy_pct=round((occ / cap) * 100, 1),
+        created_at=shelter.created_at,
+    )
+
+
+@router.get("/resources/shelters/{id}", response_model=ShelterOut)
+async def get_admin_shelter(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    stmt = select(Place).where(Place.id == id, Place.type == PlaceTypeEnum.shelter)
+    res = await db.execute(stmt)
+    s = res.scalar_one_or_none()
+    if not s:
+        raise HTTPException(status_code=404, detail="Shelter not found")
+
+    cap = s.capacity or 1
+    occ = s.current_occupancy or 0
+    return ShelterOut(
+        id=s.id,
+        name=s.name,
+        address=s.address,
+        latitude=s.latitude,
+        longitude=s.longitude,
+        capacity=s.capacity,
+        current_occupancy=occ,
+        available=s.available,
+        contact=s.contact,
+        free_beds=max(0, cap - occ),
+        occupancy_pct=round(min(100.0, (occ / cap) * 100), 1),
+        created_at=s.created_at,
+    )
+
+
+@router.put("/resources/shelters/{id}", response_model=ShelterOut)
+async def update_admin_shelter(
+    id: int,
+    body: ShelterUpdate,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    stmt = select(Place).where(Place.id == id, Place.type == PlaceTypeEnum.shelter)
+    res = await db.execute(stmt)
+    s = res.scalar_one_or_none()
+    if not s:
+        raise HTTPException(status_code=404, detail="Shelter not found")
+
+    old_data = {"name": s.name, "capacity": s.capacity, "occupancy": s.current_occupancy, "available": s.available}
+    s.name = body.name.strip()
+    s.address = body.address.strip()
+    s.latitude = body.latitude
+    s.longitude = body.longitude
+    s.capacity = body.capacity
+    s.current_occupancy = body.current_occupancy
+    s.available = body.available
+    s.contact = body.contact.strip() if body.contact else None
+
+    await record_audit_event(
+        db,
+        action="shelter.updated",
+        actor_id=current_user.id,
+        actor_role=current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role),
+        entity_type="shelter",
+        entity_id=s.id,
+        details={"old": old_data, "new": {"name": s.name, "capacity": s.capacity, "occupancy": s.current_occupancy}},
+        ip_address=request.client.host if request.client else None,
+    )
+    await db.commit()
+    await db.refresh(s)
+
+    return await get_admin_shelter(id=s.id, db=db, current_user=current_user)
+
+
+@router.patch("/resources/shelters/{id}", response_model=ShelterOut)
+async def patch_admin_shelter(
+    id: int,
+    body: ShelterPatch,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    stmt = select(Place).where(Place.id == id, Place.type == PlaceTypeEnum.shelter)
+    res = await db.execute(stmt)
+    s = res.scalar_one_or_none()
+    if not s:
+        raise HTTPException(status_code=404, detail="Shelter not found")
+
+    changes = {}
+    if body.current_occupancy is not None:
+        changes["current_occupancy"] = {"old": s.current_occupancy, "new": body.current_occupancy}
+        s.current_occupancy = max(0, body.current_occupancy)
+    elif body.delta_occupancy is not None:
+        new_occ = max(0, s.current_occupancy + body.delta_occupancy)
+        changes["current_occupancy"] = {"old": s.current_occupancy, "new": new_occ, "delta": body.delta_occupancy}
+        s.current_occupancy = new_occ
+
+    if body.capacity is not None:
+        changes["capacity"] = {"old": s.capacity, "new": body.capacity}
+        s.capacity = body.capacity
+
+    if body.available is not None:
+        changes["available"] = {"old": s.available, "new": body.available}
+        s.available = body.available
+
+    if body.contact is not None:
+        s.contact = body.contact.strip() or None
+        changes["contact"] = s.contact
+
+    await record_audit_event(
+        db,
+        action="shelter.patched",
+        actor_id=current_user.id,
+        actor_role=current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role),
+        entity_type="shelter",
+        entity_id=s.id,
+        details=changes,
+        ip_address=request.client.host if request.client else None,
+    )
+    await db.commit()
+    return await get_admin_shelter(id=s.id, db=db, current_user=current_user)
+
+
+@router.delete("/resources/shelters/{id}")
+async def delete_admin_shelter(
+    id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    stmt = select(Place).where(Place.id == id, Place.type == PlaceTypeEnum.shelter)
+    res = await db.execute(stmt)
+    s = res.scalar_one_or_none()
+    if not s:
+        raise HTTPException(status_code=404, detail="Shelter not found")
+
+    name = s.name
+    await db.delete(s)
+    await record_audit_event(
+        db,
+        action="shelter.deleted",
+        actor_id=current_user.id,
+        actor_role=current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role),
+        entity_type="shelter",
+        entity_id=id,
+        details={"name": name},
+        ip_address=request.client.host if request.client else None,
+    )
+    await db.commit()
+    return {"message": f"Shelter '{name}' deleted successfully", "id": id}
+
+
+# ── Combined Incident Resources Assignment & Release ───────────────
+
+@router.post("/incidents/{id}/resources", response_model=IncidentAssignResourcesResponse)
+async def assign_incident_resources(
+    id: int,
+    body: IncidentAssignResourcesRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    """
+    Assign a response team, vehicles and supplies to an incident in a single transaction.
+    Validates availability, decrements stock, marks teams and vehicles as busy/in_use.
+    """
+    stmt = select(Incident).where(Incident.id == id)
+    res = await db.execute(stmt)
+    incident = res.scalar_one_or_none()
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+
+    team = None
+    if body.team_id:
+        team_res = await db.execute(select(ResponseTeam).where(ResponseTeam.id == body.team_id))
+        team = team_res.scalar_one_or_none()
+        if not team:
+            raise HTTPException(status_code=404, detail=f"Response team #{body.team_id} not found")
+        if team.status != TeamStatusEnum.available and team.current_incident_id != incident.id:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Team '{team.name}' is currently busy and cannot be assigned"
+            )
+
+    vehicles_to_assign = []
+    if body.vehicle_ids:
+        for vid in body.vehicle_ids:
+            v_res = await db.execute(select(Vehicle).where(Vehicle.id == vid))
+            v = v_res.scalar_one_or_none()
+            if not v:
+                raise HTTPException(status_code=404, detail=f"Vehicle #{vid} not found")
+            if v.status != VehicleStatusEnum.available and v.current_incident_id != incident.id:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Vehicle '{v.name}' ({v.plate}) is currently {v.status.value} and cannot be assigned"
+                )
+            vehicles_to_assign.append(v)
+
+    supplies_to_allocate = []
+    if body.supplies:
+        for s_req in body.supplies:
+            s_res = await db.execute(select(Supply).where(Supply.id == s_req.supply_id))
+            sup = s_res.scalar_one_or_none()
+            if not sup:
+                raise HTTPException(status_code=404, detail=f"Supply item #{s_req.supply_id} not found")
+            if sup.quantity < s_req.quantity:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Insufficient stock for '{sup.item}'. Available: {sup.quantity} {sup.unit}, requested: {s_req.quantity}"
+                )
+            supplies_to_allocate.append((sup, s_req.quantity))
+
+    # All checks passed — apply state mutations atomically
+    allocated_supplies_info = []
+
+    if team:
+        team.status = TeamStatusEnum.busy
+        team.current_incident_id = incident.id
+        comp_team_res = await db.execute(select(Team).where(Team.name == team.name))
+        comp_team = comp_team_res.scalar_one_or_none()
+        if comp_team:
+            comp_team.is_available = False
+            db.add(Assignment(incident_id=incident.id, team_id=comp_team.id, assigned_by=current_user.id))
+
+    for v in vehicles_to_assign:
+        v.status = VehicleStatusEnum.in_use
+        v.current_incident_id = incident.id
+        if team and not v.assigned_team_id:
+            v.assigned_team_id = team.id
+
+    for sup, qty in supplies_to_allocate:
+        sup.quantity -= qty
+        alloc = IncidentSupplyAllocation(
+            incident_id=incident.id,
+            supply_id=sup.id,
+            quantity=qty,
+        )
+        db.add(alloc)
+        allocated_supplies_info.append({
+            "supply_id": sup.id,
+            "item": sup.item,
+            "quantity": qty,
+            "unit": sup.unit,
+            "remaining_stock": sup.quantity,
+        })
+
+    if incident.status in [StatusEnum.reported, StatusEnum.under_review]:
+        old_st = incident.status.value
+        incident.status = StatusEnum.assigned
+        db.add(
+            StatusHistory(
+                incident_id=incident.id,
+                old_status=old_st,
+                new_status="assigned",
+                changed_by=current_user.id,
+                note="Assigned response team and operational resources via resource management.",
+            )
+        )
+        if incident.reporter_id:
+            db.add(
+                Notification(
+                    user_id=incident.reporter_id,
+                    incident_id=incident.id,
+                    type="status_change",
+                    title="Response Resources Dispatched",
+                    message=f"Rescue team and equipment have been dispatched to incident {incident.public_code}.",
+                )
+            )
+
+    audit_details = {
+        "incident_code": incident.public_code,
+        "team_id": team.id if team else None,
+        "team_name": team.name if team else None,
+        "vehicle_ids": [v.id for v in vehicles_to_assign],
+        "supplies": allocated_supplies_info,
+    }
+
+    await record_audit_event(
+        db,
+        action="incident.resources_assigned",
+        actor_id=current_user.id,
+        actor_role=current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role),
+        entity_type="incident",
+        entity_id=incident.id,
+        details=audit_details,
+        ip_address=request.client.host if request.client else None,
+    )
+
+    await db.commit()
+    await db.refresh(incident)
+
+    return IncidentAssignResourcesResponse(
+        incident_id=incident.id,
+        incident_status=incident.status.value,
+        assigned_team_id=team.id if team else None,
+        assigned_vehicle_ids=[v.id for v in vehicles_to_assign],
+        allocated_supplies=allocated_supplies_info,
+        message=f"Resources successfully dispatched and assigned to incident {incident.public_code}",
+    )
+
+
+@router.post("/incidents/{id}/resources/release", response_model=IncidentReleaseResourcesResponse)
+async def release_incident_resources(
+    id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    """
+    Frees all response teams and vehicles allocated to this incident.
+    Marks them as available and removes their current_incident_id.
+    """
+    stmt = select(Incident).where(Incident.id == id)
+    res = await db.execute(stmt)
+    incident = res.scalar_one_or_none()
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+
+    t_res = await db.execute(select(ResponseTeam).where(ResponseTeam.current_incident_id == incident.id))
+    freed_teams = t_res.scalars().all()
+    for t in freed_teams:
+        t.status = TeamStatusEnum.available
+        t.current_incident_id = None
+
+    v_res = await db.execute(select(Vehicle).where(Vehicle.current_incident_id == incident.id))
+    freed_veh = v_res.scalars().all()
+    for v in freed_veh:
+        v.status = VehicleStatusEnum.available
+        v.current_incident_id = None
+
+    await record_audit_event(
+        db,
+        action="incident.resources_released",
+        actor_id=current_user.id,
+        actor_role=current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role),
+        entity_type="incident",
+        entity_id=incident.id,
+        details={
+            "incident_code": incident.public_code,
+            "freed_teams_count": len(freed_teams),
+            "freed_vehicles_count": len(freed_veh),
+        },
+        ip_address=request.client.host if request.client else None,
+    )
+
+    await db.commit()
+
+    return IncidentReleaseResourcesResponse(
+        incident_id=incident.id,
+        freed_teams=len(freed_teams),
+        freed_vehicles=len(freed_veh),
+        message=f"Successfully freed {len(freed_teams)} team(s) and {len(freed_veh)} vehicle(s) from incident {incident.public_code}",
     )
