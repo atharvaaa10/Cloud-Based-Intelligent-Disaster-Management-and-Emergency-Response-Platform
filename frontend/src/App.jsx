@@ -43,7 +43,7 @@ function App() {
             <Route path="/" element={<RootRedirect />} />
 
             {/* Citizen routes */}
-            <Route element={<ProtectedRoute roles={['citizen', 'admin', 'responder']}><AppLayout /></ProtectedRoute>}>
+            <Route element={<ProtectedRoute roles={['citizen', 'admin']}><AppLayout /></ProtectedRoute>}>
               <Route path="/citizen" element={<ErrorBoundary title="Failed to load Citizen Overview"><CitizenOverview /></ErrorBoundary>} />
               <Route path="/citizen/map" element={<ErrorBoundary title="Failed to load Live Map"><LiveMap /></ErrorBoundary>} />
               <Route path="/map" element={<Navigate to="/citizen/map" replace />} />
@@ -54,8 +54,8 @@ function App() {
               <Route path="/citizen/updates" element={<ErrorBoundary title="Failed to load Updates"><CitizenUpdates /></ErrorBoundary>} />
             </Route>
 
-            {/* Admin / Responder routes */}
-            <Route element={<ProtectedRoute roles={['admin', 'responder']}><AppLayout /></ProtectedRoute>}>
+            {/* Admin routes */}
+            <Route element={<ProtectedRoute roles={['admin']}><AppLayout /></ProtectedRoute>}>
               <Route path="/admin" element={<ErrorBoundary title="Failed to load Admin Dashboard"><AdminDashboard /></ErrorBoundary>} />
               <Route path="/admin/incidents/:id" element={<ErrorBoundary title="Failed to load Incident Details"><IncidentDetail /></ErrorBoundary>} />
               <Route path="/admin/teams" element={<ProtectedRoute roles={['admin']}><ErrorBoundary title="Failed to load Teams"><TeamsPage /></ErrorBoundary></ProtectedRoute>} />

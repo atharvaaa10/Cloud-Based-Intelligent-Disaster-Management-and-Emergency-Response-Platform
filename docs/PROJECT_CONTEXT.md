@@ -50,7 +50,8 @@ The primary objective of **ResQCloud** is to provide a resilient, cloud-native e
 
 3. **Backend-Enforced Role-Based Access Control (RBAC):**
    * Security is never entrusted solely to client-side route guards.
-   * Every sensitive API endpoint must enforce role dependencies (`require_roles("admin", "responder")`).
+   * Two application roles (citizen, admin). Response teams and shelters are managed resources, not user accounts.
+   * Every sensitive API endpoint must enforce role dependencies (`require_roles("admin")`).
    * Citizens may only query their own submitted incidents (`/incidents/mine`).
 
 4. **Design System & Aesthetics:**

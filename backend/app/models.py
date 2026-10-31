@@ -46,8 +46,6 @@ def generate_tracking_code() -> str:
 
 class RoleEnum(str, enum.Enum):
     citizen = "citizen"
-    volunteer = "volunteer"
-    responder = "responder"
     admin = "admin"
 
 
@@ -106,7 +104,7 @@ class User(Base):
     """
     Users table:
     id, full_name, email (unique), phone, password_hash,
-    role (citizen|volunteer|responder|admin), created_at
+    role (citizen|admin), created_at
     """
     __tablename__ = "users"
 

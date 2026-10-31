@@ -114,7 +114,6 @@ export default function LiveMap() {
   const toast = useToast();
 
   const isCitizen = user?.role === 'citizen';
-  const isAdminOrResponder = user?.role === 'admin' || user?.role === 'responder';
 
   // ── Data State ────────────────────────────────────────────────
   const [publicData, setPublicData] = useState({

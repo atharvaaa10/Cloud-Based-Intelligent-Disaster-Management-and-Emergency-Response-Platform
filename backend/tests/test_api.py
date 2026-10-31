@@ -128,7 +128,6 @@ async def create_user_with_role(role: RoleEnum, name: str, email: str) -> str:
 async def test_admin_assigns_team_and_flow(client: AsyncClient):
     # 1. Prepare roles
     admin_token = await create_user_with_role(RoleEnum.admin, "Admin", "admin_flow@test.com")
-    responder_token = await create_user_with_role(RoleEnum.responder, "Responder", "resp_flow@test.com")
     citizen_token = await register_and_login(client, "Citizen User", "citizen_flow@test.com", "cit12345")
 
     # 2. Admin creates a rescue team
@@ -168,20 +167,27 @@ async def test_admin_assigns_team_and_flow(client: AsyncClient):
     assert team_check.status_code == 200
     assert team_check.json()["is_available"] is False
 
-    # 6. Responder moves status to in_progress
+    # 6. Admin moves status to in_progress (citizen gets 403)
+    forbidden_status = await client.patch(
+        f"/incidents/{incident_id}/status",
+        json={"status": "in_progress", "note": "Citizen trying to change status"},
+        headers=auth_header(citizen_token),
+    )
+    assert forbidden_status.status_code == 403
+
     progress_resp = await client.patch(
         f"/incidents/{incident_id}/status",
         json={"status": "in_progress", "note": "Team deployed on site"},
-        headers=auth_header(responder_token),
+        headers=auth_header(admin_token),
     )
     assert progress_resp.status_code == 200
     assert progress_resp.json()["status"] == "in_progress"
 
-    # 7. Responder resolves incident -> team freed
+    # 7. Admin resolves incident -> team freed
     resolve_resp = await client.patch(
         f"/incidents/{incident_id}/status",
         json={"status": "resolved", "note": "All citizens safely evacuated"},
-        headers=auth_header(responder_token),
+        headers=auth_header(admin_token),
     )
     assert resolve_resp.status_code == 200
     assert resolve_resp.json()["status"] == "resolved"
@@ -266,7 +272,6 @@ async def test_photo_url_rbac_permissions(client: AsyncClient):
     owner_token = await register_and_login(client, "Photo Owner", "owner_pic@test.com", "pic12345")
     other_citizen_token = await register_and_login(client, "Other Citizen", "other_cit@test.com", "cit12345")
     admin_token = await create_user_with_role(RoleEnum.admin, "Photo Admin", "admin_pic@test.com")
-    responder_token = await create_user_with_role(RoleEnum.responder, "Photo Responder", "resp_pic@test.com")
 
     # Create incident with photo_key
     inc_resp = await client.post(
@@ -287,10 +292,6 @@ async def test_photo_url_rbac_permissions(client: AsyncClient):
     # 3. Admin can access
     admin_access = await client.get(f"/incidents/{incident_id}/photo-url", headers=auth_header(admin_token))
     assert admin_access.status_code == 200
-
-    # 4. Responder can access
-    resp_access = await client.get(f"/incidents/{incident_id}/photo-url", headers=auth_header(responder_token))
-    assert resp_access.status_code == 200
 
 
 async def test_photo_upload_url_for_existing_incident(client: AsyncClient):

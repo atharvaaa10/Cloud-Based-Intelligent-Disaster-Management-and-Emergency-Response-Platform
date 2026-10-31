@@ -18,7 +18,7 @@ router = APIRouter(prefix="/resources", tags=["resources"])
 @router.get("", response_model=list[ResourceOut])
 async def list_resources(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles("admin", "responder")),
+    current_user: User = Depends(require_roles("admin")),
 ):
     result = await db.execute(select(Resource).order_by(Resource.id))
     return result.scalars().all()
@@ -55,7 +55,7 @@ async def create_resource(
 async def get_resource(
     resource_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles("admin", "responder")),
+    current_user: User = Depends(require_roles("admin")),
 ):
     result = await db.execute(select(Resource).where(Resource.id == resource_id))
     resource = result.scalar_one_or_none()

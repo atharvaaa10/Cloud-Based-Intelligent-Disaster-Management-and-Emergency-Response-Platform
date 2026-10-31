@@ -59,7 +59,7 @@ powershell -File scripts/deploy.ps1 -WhatIf -AlertEmail test@example.com
 * `test_register_and_login_citizen`: Citizen account registration, bcrypt password hashing, and JWT token issuance.
 * `test_login_invalid_credentials`: Returns HTTP 401 on incorrect password.
 * `test_role_permissions_citizen_cannot_list_all`: Enforces RBAC; citizens cannot access full incident list.
-* `test_role_permissions_admin_and_responder`: Validates administrative operations.
+* `test_role_permissions_admin`: Validates administrative operations for admin vs citizen.
 
 ### Group 2: Incident Lifecycle & Direct S3 Uploads (`test_api.py`)
 * `test_create_incident_success`: Validates field persistence and default `medium` priority.

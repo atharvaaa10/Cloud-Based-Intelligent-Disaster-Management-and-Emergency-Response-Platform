@@ -20,7 +20,7 @@ router = APIRouter(prefix="/response-teams", tags=["response-teams"])
 async def list_response_teams(
     status: Optional[str] = Query(None, pattern=r"^(available|busy)$"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles("admin", "responder", "volunteer")),
+    current_user: User = Depends(require_roles("admin")),
 ):
     """List all response teams, optionally filtered by availability status."""
     query = select(ResponseTeam)
@@ -35,7 +35,7 @@ async def list_response_teams(
 async def get_response_team(
     team_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles("admin", "responder", "volunteer")),
+    current_user: User = Depends(require_roles("admin")),
 ):
     """Get single response team details."""
     result = await db.execute(select(ResponseTeam).where(ResponseTeam.id == team_id))
@@ -79,7 +79,7 @@ async def update_response_team_status(
     body: ResponseTeamStatusUpdate,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles("admin", "responder")),
+    current_user: User = Depends(require_roles("admin")),
 ):
     """Update team status (available vs busy)."""
     result = await db.execute(select(ResponseTeam).where(ResponseTeam.id == team_id))

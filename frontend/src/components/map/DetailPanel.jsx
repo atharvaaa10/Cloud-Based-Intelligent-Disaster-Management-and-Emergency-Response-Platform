@@ -42,7 +42,7 @@ export default function DetailPanel({
 
   const isIncident = selectedType === 'own' || selectedType === 'public';
   const isOwn = selectedItem.isOwn;
-  const isAdminOrResponder = user?.role === 'admin' || user?.role === 'responder';
+  const isAdmin = user?.role === 'admin';
 
   const displayCode = selectedItem.public_code || `#DR-${selectedItem.id}`;
   const displayTitle = isOwn
@@ -142,7 +142,7 @@ export default function DetailPanel({
         {/* 7. Quick actions (citizen: Get directions and Call 112 only) */}
         <div className="panel-section-wrap">
           <h3 className="panel-section-title">Quick actions</h3>
-          {isAdminOrResponder ? (
+          {isAdmin ? (
             <div className="panel-actions-grid">
               <button
                 type="button"

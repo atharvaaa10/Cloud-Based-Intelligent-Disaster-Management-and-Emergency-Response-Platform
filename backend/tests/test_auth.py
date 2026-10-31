@@ -208,9 +208,9 @@ async def test_admin_can_list_incidents(client: AsyncClient):
     assert r.status_code == 200
 
 
-async def test_responder_can_list_incidents(client: AsyncClient):
-    resp_token = await _make_user(RoleEnum.responder, "RBAC Resp", "rbac_resp@example.com")
-    r = await client.get("/incidents", headers=_auth(resp_token))
+async def test_only_admin_can_list_all_incidents(client: AsyncClient):
+    admin_token = await _make_user(RoleEnum.admin, "RBAC Admin", "rbac_admin_list@example.com")
+    r = await client.get("/incidents", headers=_auth(admin_token))
     assert r.status_code == 200
 
 

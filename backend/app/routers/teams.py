@@ -18,7 +18,7 @@ router = APIRouter(prefix="/teams", tags=["teams"])
 @router.get("", response_model=list[TeamOut])
 async def list_teams(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles("admin", "responder")),
+    current_user: User = Depends(require_roles("admin")),
 ):
     result = await db.execute(select(Team).order_by(Team.id))
     return result.scalars().all()
@@ -55,7 +55,7 @@ async def create_team(
 async def get_team(
     team_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles("admin", "responder")),
+    current_user: User = Depends(require_roles("admin")),
 ):
     result = await db.execute(select(Team).where(Team.id == team_id))
     team = result.scalar_one_or_none()

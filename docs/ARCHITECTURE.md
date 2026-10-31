@@ -12,7 +12,7 @@ The platform combines containerized microservices hosted on Amazon EC2 with a se
 graph TB
     subgraph Clients["Clients & Users"]
         Citizen["👤 Citizen (Reporter)"]
-        Admin["👮 Admin / Responders"]
+        Admin["👮 Operations Admin"]
     end
 
     subgraph AWS_Cloud["AWS Cloud (Region: ap-south-1)"]

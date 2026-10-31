@@ -27,7 +27,6 @@ export default function AppLayout() {
   const { count: bellCount } = useBellCount();
 
   const isAdmin = user?.role === 'admin';
-  const isResponder = user?.role === 'responder';
   const isCitizen = user?.role === 'citizen';
 
   const initials = user?.name
@@ -241,7 +240,7 @@ export default function AppLayout() {
     );
   }
 
-  // ── Admin / Responder Layout (Sidebar + Top Bar) ───────────────
+  // ── Admin Layout (Sidebar + Top Bar) ───────────────
   return (
     <div className="app-shell">
       {/* Mobile backdrop */}
@@ -269,7 +268,7 @@ export default function AppLayout() {
         </div>
 
         <nav className="sidebar-nav" aria-label="Operations navigation">
-          {(isAdmin || isResponder) && (
+          {isAdmin && (
             <>
               <div className="nav-section-label">Operations</div>
               <NavLink

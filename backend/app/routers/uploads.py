@@ -200,7 +200,7 @@ async def serve_upload(
 ):
     """
     Serves a locally-stored photo.
-    - Only the incident's reporter or an admin/responder may access the file.
+    - Only the incident's reporter or an admin may access the file.
     - Returns 404 when USE_AWS=True (use presigned download URL instead).
     """
     settings = get_settings()
@@ -210,7 +210,7 @@ async def serve_upload(
             detail="Local file serving not available when USE_AWS=True. Use presigned download URL.",
         )
 
-    # ── Authorisation: owner or admin/responder ─────────────────────────────
+    # ── Authorisation: owner or admin ─────────────────────────────
     result = await db.execute(
         select(Incident).where(Incident.photo_key == photo_key)
     )
@@ -218,14 +218,14 @@ async def serve_upload(
 
     role = current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role)
     if incident is not None:
-        if role not in ["admin", "responder"] and incident.reporter_id != current_user.id:
+        if role != "admin" and incident.reporter_id != current_user.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You are not authorised to view this photo.",
             )
     else:
         # Photo not linked to an incident
-        if role not in ["admin", "responder"]:
+        if role != "admin":
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Photo not found or not yet linked to an incident.",

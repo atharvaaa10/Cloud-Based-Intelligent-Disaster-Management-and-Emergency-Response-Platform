@@ -154,8 +154,8 @@ async def get_photo_url(
     current_user: User = Depends(get_current_user),
 ):
     """
-    Generate a presigned GET URL for authorized users (reporter, admin, responder).
-    Enforces that only the incident owner and admins/responders can retrieve the photo URL.
+    Generate a presigned GET URL for authorized users (reporter, admin).
+    Enforces that only the incident owner and admins can retrieve the photo URL.
     """
     result = await db.execute(select(Incident).where(Incident.id == incident_id))
     incident = result.scalar_one_or_none()
@@ -163,7 +163,7 @@ async def get_photo_url(
         raise HTTPException(status_code=404, detail="Incident not found")
 
     role = current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role)
-    if role not in ["admin", "responder"] and incident.reporter_id != current_user.id:
+    if role != "admin" and incident.reporter_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorised to view this incident photo")
 
     if not incident.photo_key:
@@ -230,7 +230,7 @@ async def my_incidents(
     return [IncidentOut.model_validate(i) for i in items]
 
 
-# â”€â”€ Admin / Responder: list all â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# â”€â”€ Admin: list all â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @router.get("", response_model=list[IncidentOut])
 async def list_incidents(
@@ -238,7 +238,7 @@ async def list_incidents(
     priority: Optional[str] = None,
     category: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles("admin", "responder")),
+    current_user: User = Depends(require_roles("admin")),
 ):
     query = select(Incident)
     if status_filter:
@@ -275,7 +275,7 @@ async def get_incident(
 
     # Only owner or admin/responder can view incident details
     role = current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role)
-    if role not in ["admin", "responder"] and incident.reporter_id != current_user.id:
+    if role != "admin" and incident.reporter_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied. Only the incident owner can view this incident.",
@@ -359,7 +359,7 @@ async def cancel_incident(
         raise HTTPException(status_code=404, detail="Incident not found")
 
     role = current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role)
-    if role not in ["admin", "responder"] and incident.reporter_id != current_user.id:
+    if role != "admin" and incident.reporter_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorised to cancel this incident.")
 
     curr_status = incident.status.value if hasattr(incident.status, 'value') else str(incident.status)
@@ -426,11 +426,11 @@ async def add_incident_note(
         raise HTTPException(status_code=404, detail="Incident not found")
 
     role = current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role)
-    if role not in ["admin", "responder"] and incident.reporter_id != current_user.id:
+    if role != "admin" and incident.reporter_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorised to add notes to this incident.")
 
     curr_status = incident.status.value if hasattr(incident.status, 'value') else str(incident.status)
-    if role not in ["admin", "responder"] and curr_status != "reported":
+    if role != "admin" and curr_status != "reported":
         raise HTTPException(
             status_code=400,
             detail=(
@@ -593,7 +593,7 @@ async def assign_team(
     return assignment
 
 
-# â”€â”€ Admin/Responder: update status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# â”€â”€ Admin: update status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @router.patch("/{incident_id}/status", response_model=IncidentOut)
 async def update_status(
@@ -601,7 +601,7 @@ async def update_status(
     body: StatusUpdate,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles("admin", "responder")),
+    current_user: User = Depends(require_roles("admin")),
 ):
     result = await db.execute(
         select(Incident).options(selectinload(Incident.assignments)).where(Incident.id == incident_id)
@@ -672,14 +672,14 @@ async def update_status(
     return incident
 
 
-# ── Admin/Responder: mark as responding ───────────────────────
+# ── Admin: mark as responding ───────────────────────
 
 @router.post("/{incident_id}/respond", response_model=IncidentOut)
 async def mark_as_responding(
     incident_id: int,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles("admin", "responder")),
+    current_user: User = Depends(require_roles("admin")),
 ):
     result = await db.execute(
         select(Incident).where(Incident.id == incident_id)

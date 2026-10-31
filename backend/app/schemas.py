@@ -16,6 +16,14 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     phone: Optional[str] = Field(default=None, max_length=50)
     password: str = Field(..., min_length=8, max_length=128)
+    role: Optional[str] = None
+
+    @field_validator("role")
+    @classmethod
+    def validate_role(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in ("citizen", "admin"):
+            raise ValueError(f"Invalid role '{v}'. Allowed roles are 'citizen' or 'admin'.")
+        return v
 
     @field_validator("password")
     @classmethod

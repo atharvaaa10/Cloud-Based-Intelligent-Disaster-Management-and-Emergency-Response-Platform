@@ -3,7 +3,7 @@ Database seed script with realistic Pune, India disaster response data.
 Localities: Kothrud, Hinjawadi, Baner, Wakad, Aundh, Sinhagad Road.
 
 Data summary:
-- Demo users for all roles: admin, responder, volunteer, citizen
+- Demo users for both application roles: admin and citizen
 - 8 Response teams (response_teams & teams)
 - 6 Emergency shelters (places)
 - 4 Hospitals (places)
@@ -79,20 +79,6 @@ async def seed_data():
                 "role": RoleEnum.admin,
             },
             {
-                "full_name": "Suresh Patil (Fire & Rescue Commander)",
-                "email": "responder@disaster.io",
-                "phone": "+91 98220 33445",
-                "password": "resp123",
-                "role": RoleEnum.responder,
-            },
-            {
-                "full_name": "Pooja Deshmukh (Pune Volunteer Lead)",
-                "email": "volunteer@disaster.io",
-                "phone": "+91 98225 55667",
-                "password": "vol123",
-                "role": RoleEnum.volunteer,
-            },
-            {
                 "full_name": "Amit Joshi (Kothrud Resident)",
                 "email": "citizen@disaster.io",
                 "phone": "+91 98221 77889",
@@ -136,7 +122,6 @@ async def seed_data():
             created_users[u["email"]] = user
 
         admin_user = created_users["admin@disaster.io"]
-        resp_user = created_users["responder@disaster.io"]
         cit_user = created_users["citizen@disaster.io"]
         priya_user = created_users["priya.sharma@example.com"]
         rahul_user = created_users["rahul.more@example.com"]
@@ -735,7 +720,7 @@ async def seed_data():
                     incident_id=incident.id,
                     old_status="assigned",
                     new_status="in_progress",
-                    changed_by=resp_user.id,
+                    changed_by=admin_user.id,
                     note="Rescue team arrived on site; operations underway",
                     created_at=created_time + timedelta(minutes=20),
                 )
@@ -746,7 +731,7 @@ async def seed_data():
                     incident_id=incident.id,
                     old_status="in_progress",
                     new_status="resolved",
-                    changed_by=resp_user.id,
+                    changed_by=admin_user.id,
                     note="Operations successfully completed. Area declared safe.",
                     created_at=created_time + timedelta(minutes=60),
                 )

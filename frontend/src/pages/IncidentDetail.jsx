@@ -44,7 +44,6 @@ export default function IncidentDetail() {
   const [newPriority, setNewPriority] = useState('');
 
   const isAdmin = user?.role === 'admin';
-  const isAdminOrResponder = ['admin', 'responder'].includes(user?.role);
 
   const loadIncident = async () => {
     try {
@@ -64,7 +63,7 @@ export default function IncidentDetail() {
         setPhotoUrl(null);
       }
 
-      if (isAdminOrResponder) {
+      if (isAdmin) {
         const teamList = await api.get('/teams');
         setTeams(teamList);
       }
@@ -477,7 +476,7 @@ export default function IncidentDetail() {
           )}
 
           {/* Update Status */}
-          {isAdminOrResponder && incident.status !== 'resolved' && (
+          {isAdmin && incident.status !== 'resolved' && (
             <Card title="Update status" padding="md">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <Select

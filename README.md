@@ -10,7 +10,7 @@ An enterprise-grade, cloud-native simulation platform for emergency reporting, a
 graph TB
     subgraph Clients["Clients & Role Portals"]
         Citizen["👤 Citizen (Reporter)"]
-        Admin["👮 Admin & Responders"]
+        Admin["👮 Operations Admin"]
     end
 
     subgraph AWS_Cloud["AWS Cloud Infrastructure (Region: ap-south-1)"]
@@ -141,11 +141,18 @@ Open **[http://localhost:5173](http://localhost:5173)** in your browser.
 
 ## 🔑 Seeded Demo Credentials
 
+> **Role Model Architecture:** Two application roles (citizen, admin). Response teams and shelters are managed resources, not user accounts.
+
 | Role | Email | Password | Permissions & Capabilities |
 | :--- | :--- | :--- | :--- |
 | **Admin** | `admin@disaster.io` | `admin123` | Full dashboard, assign teams, update priority & status, manage teams & resources, inspect audit log |
-| **Responder** | `responder@disaster.io` | `resp123` | View dashboard & details, update incident status (`in_progress`, `resolved`), free rescue teams |
-| **Citizen** | `citizen@disaster.io` | `cit123` | Report emergencies with photos, track own requests and status history timeline |
+| **Citizen** | `citizen@disaster.io` | `cit123` | Report emergencies with photos, track own requests, view live map, updates & safety guidelines |
+
+### Administrative Account Provisioning (CLI)
+Admin accounts cannot be registered publicly via the citizen registration form. To provision or promote an administrator account from the command line:
+```bash
+python -m app.cli create-admin --email ops-admin@disaster.io --name "Lead Controller"
+```
 
 ---
 
