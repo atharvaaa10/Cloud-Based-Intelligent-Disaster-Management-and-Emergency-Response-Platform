@@ -11,7 +11,7 @@
 Natural disasters (such as flash floods, earthquakes, and urban fires) trigger sudden, concentrated surges in emergency calls and relief requests. Traditional municipal emergency dispatch architectures suffer from severe structural bottlenecks:
 1. **Synchronous Ingestion Failures**: Traditional monoliths process incident reports synchronously against a relational database and dispatch pipeline. Under sudden peak traffic, database lock contention and downstream timeouts cause submission requests to fail, leaving citizens unable to report life-threatening situations.
 2. **Subjective and Delayed Triage**: Initial prioritization is often performed manually by human dispatchers reviewing unstructured text descriptions, introducing dangerous latency before critical rescue teams are dispatched.
-3. **Lack of Operational Visibility and Auditability**: In multi-agency disaster responses, tracking which responder changed an incident status or which team was assigned is crucial for accountability and post-incident reviews.
+3. **Lack of Operational Visibility and Auditability**: In multi-agency disaster responses, tracking which administrator or coordinator changed an incident status or which team was assigned is crucial for accountability and post-incident reviews.
 4. **Cloud Cost and Architectural Complexity**: Emergency response systems for regional municipalities must remain cost-efficient during quiet periods while maintaining the ability to buffer and absorb massive bursts during catastrophes.
 
 ---
@@ -66,7 +66,7 @@ The platform employs a hybrid **containerized compute and serverless event-drive
    * Keyword Matches (`trapped`, `elderly`, `rising water`): $+15 + 10 + 5 = +30$
    * Total Score: $90 \rightarrow \text{\textbf{Critical}}$ Priority.
 7. **Protected Internal API Update**: Lambda calls `POST /internal/incidents/101/triage` with the shared `X-Internal-Token` header. The API verifies the token using `hmac.compare_digest`, updates the database record (`priority="critical"`, `triage_score=90`), records a note in `status_history`, and writes an audit log entry.
-8. **Emergency Broadcast**: Lambda publishes an SNS alert with the subject `CRITICAL ALERT: [rescue] at [Downtown Pune]`. Responders and administrative staff receive immediate email notifications.
+8. **Emergency Broadcast**: Lambda publishes an SNS alert with the subject `CRITICAL ALERT: [rescue] at [Downtown Pune]`. Administrative staff and response dispatchers receive immediate email notifications.
 9. **Dispatch & Resolution**: The administrator logs into the portal, sees the `⚡ Auto-triaged` badge, assigns an available rescue team, and updates status to `in_progress` and finally `resolved`. Each transition records an application audit entry and publishes SNS updates.
 
 ---

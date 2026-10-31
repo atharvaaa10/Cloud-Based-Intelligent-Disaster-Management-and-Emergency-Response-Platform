@@ -8,7 +8,7 @@ Asynchronous, high-throughput disaster response and emergency management API bui
 
 - **Relational ACID Storage**: PostgreSQL 16 / SQLite via SQLAlchemy 2.0 async engine and session factory.
 - **Declarative Migrations**: Full revision tracking with Alembic.
-- **Role-Based Access Control (RBAC)**: Distinct permissions for `admin`, `responder`, `volunteer`, and `citizen` secured by signed JWT tokens.
+- **Role-Based Access Control (RBAC)**: Two application roles (`citizen` and `admin`) secured by signed JWT tokens.
 - **Municipal Disaster Triage**: Real-time scoring, emergency dispatching, status tracking, and public reference codes (`DR-XXXX`).
 - **Observability & Health Checks**: Unauthenticated `/health` endpoint for load balancers and container orchestrators.
 - **CORS Configured**: Pre-configured for Vite React SPA (`http://localhost:5173`).
@@ -96,9 +96,9 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 ## 🔑 Demo Seed Credentials
 
+> Two application roles (citizen, admin). Response teams and shelters are managed resources, not user accounts.
+
 | Role | Email | Password | Phone |
 | :--- | :--- | :--- | :--- |
 | **Admin** | `admin@disaster.io` | `admin123` | +91 98230 11223 |
-| **Responder** | `responder@disaster.io` | `resp123` | +91 98220 33445 |
-| **Volunteer** | `volunteer@disaster.io` | `vol123` | +91 98225 55667 |
 | **Citizen** | `citizen@disaster.io` | `cit123` | +91 98221 77889 |

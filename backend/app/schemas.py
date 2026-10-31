@@ -469,4 +469,118 @@ class GlobalStatCardsOut(BaseModel):
     stock_level_status: str  # "Low" | "Adequate" | "Good"
 
 
+# ── Admin Overview Schema ──────────────────────────────────────
 
+class DailyIncidentCount(BaseModel):
+    date: str
+    count: int
+
+
+class AdminOverviewOut(BaseModel):
+    total_incidents: int
+    pending_reports: int
+    active_emergencies: int
+    resolved_cases: int
+    critical_alerts: int
+    incidents_per_day: List[DailyIncidentCount]
+    by_category: Dict[str, int]
+    critical_incidents: List[IncidentOut] = []
+
+# ── Admin Incident Management Schemas ─────────────────────────
+
+class ReporterContactOut(BaseModel):
+    id: int
+    name: Optional[str] = None
+    full_name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+
+
+class AdminIncidentDetailOut(BaseModel):
+    id: int
+    public_code: str
+    tracking_code: str
+    reporter_id: Optional[int] = None
+    category: str
+    description: str
+    address: Optional[str] = None
+    location_text: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    people_affected: Optional[int] = None
+    priority: str
+    status: str
+    photo_key: Optional[str] = None
+    photo_url: Optional[str] = None
+    triage_score: Optional[int] = None
+    triage_reason: Optional[str] = None
+    auto_triaged_at: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
+    reporter: Optional[ReporterContactOut] = None
+    status_history: List[StatusHistoryOut] = []
+    assignments: List[AssignmentOut] = []
+    suggested_priority: Optional[Dict[str, Any]] = None
+
+
+class AdminIncidentListResponse(BaseModel):
+    items: List[IncidentOut]
+    total: int
+    page: int
+    limit: int
+    total_pages: int
+
+
+class AdminIncidentPatchRequest(BaseModel):
+    priority: Optional[str] = None
+    status: Optional[str] = None
+    note: Optional[str] = None
+
+
+
+class AdminIncidentMarker(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    public_code: str
+    tracking_code: str
+    category: str
+    description: str
+    address: Optional[str] = None
+    location_text: Optional[str] = None
+    latitude: float
+    longitude: float
+    people_affected: Optional[int] = None
+    priority: str
+    status: str
+    photo_key: Optional[str] = None
+    photo_url: Optional[str] = None
+    triage_score: Optional[int] = None
+    triage_reason: Optional[str] = None
+    created_at: datetime
+    reporter: Optional[ReporterContactOut] = None
+    assigned_teams: List[str] = []
+
+
+class AdminTeamMarker(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    name: str
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    status: str
+
+
+class AdminMapResponse(BaseModel):
+    incidents: List[AdminIncidentMarker]
+    shelters: List[PlaceOut]
+    hospitals: List[PlaceOut]
+    supplies: List[PlaceOut]
+    places: List[PlaceOut]
+    response_teams: List[AdminTeamMarker]
+    affected_zones: List[AffectedZoneOut]
+    total_incidents: int
+    total_shelters: int
+    total_hospitals: int
+    total_supplies: int
+    total_teams: int
+    total_zones: int

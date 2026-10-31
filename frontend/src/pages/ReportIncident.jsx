@@ -303,7 +303,7 @@ export default function ReportIncident() {
 
           <h1 className="ui-page-title" style={{ marginBottom:6 }}>Emergency report submitted</h1>
           <p className="ui-page-desc" style={{ marginBottom:24 }}>
-            Your report is logged and routed to responders. Keep your tracking code safe.
+            Your report is logged and routed for response. Keep your tracking code safe.
           </p>
 
           <div style={{
@@ -354,7 +354,7 @@ export default function ReportIncident() {
             <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#EF4444', boxShadow: '0 0 10px #EF4444' }} />
             <span>Report Emergency</span>
           </h1>
-          <p className="ui-page-desc">Automated AI priority triage and immediate responder dispatch for Pune district.</p>
+          <p className="ui-page-desc">Automated AI priority triage and immediate response dispatch for Pune district.</p>
         </div>
 
         <div className="live-indicator-wrap" style={{ marginTop: 4 }}>

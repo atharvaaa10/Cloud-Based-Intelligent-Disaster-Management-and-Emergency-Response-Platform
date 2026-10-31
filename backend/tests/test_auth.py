@@ -195,7 +195,7 @@ async def test_login_rate_limit_blocks_after_5_failures(client: AsyncClient):
 
 
 async def test_citizen_cannot_list_all_incidents(client: AsyncClient):
-    """GET /incidents (admin/responder only) must return 403 for citizen."""
+    """GET /incidents (admin only) must return 403 for citizen."""
     await _register(client, email="cit_rbac@example.com", password="Cit12345")
     token = await _login(client, "cit_rbac@example.com", "Cit12345")
     r = await client.get("/incidents", headers=_auth(token))

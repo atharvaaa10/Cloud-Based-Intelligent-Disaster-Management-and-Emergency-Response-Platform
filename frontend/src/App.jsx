@@ -8,10 +8,10 @@ import LiveMap from './pages/LiveMap';
 import MyRequests from './pages/MyRequests';
 import ReportIncident from './pages/ReportIncident';
 import AdminDashboard from './pages/AdminDashboard';
+import AdminIncidents from './pages/AdminIncidents';
 import IncidentDetail from './pages/IncidentDetail';
-import TeamsPage from './pages/TeamsPage';
-import ResourcesPage from './pages/ResourcesPage';
-import AuditLog from './pages/AuditLog';
+import AdminResources from './pages/AdminResources';
+import AdminActivity from './pages/AdminActivity';
 import CitizenResources from './pages/CitizenResources';
 import CitizenUpdates from './pages/CitizenUpdates';
 import ErrorBoundary from './components/ui/ErrorBoundary';
@@ -56,11 +56,23 @@ function App() {
 
             {/* Admin routes */}
             <Route element={<ProtectedRoute roles={['admin']}><AppLayout /></ProtectedRoute>}>
-              <Route path="/admin" element={<ErrorBoundary title="Failed to load Admin Dashboard"><AdminDashboard /></ErrorBoundary>} />
+              {/* 1. Dashboard */}
+              <Route path="/admin" element={<ErrorBoundary title="Failed to load Dashboard"><AdminDashboard /></ErrorBoundary>} />
+
+              {/* 2. Incident Management */}
+              <Route path="/admin/incidents" element={<ErrorBoundary title="Failed to load Incident Management"><AdminIncidents /></ErrorBoundary>} />
               <Route path="/admin/incidents/:id" element={<ErrorBoundary title="Failed to load Incident Details"><IncidentDetail /></ErrorBoundary>} />
-              <Route path="/admin/teams" element={<ProtectedRoute roles={['admin']}><ErrorBoundary title="Failed to load Teams"><TeamsPage /></ErrorBoundary></ProtectedRoute>} />
-              <Route path="/admin/resources" element={<ProtectedRoute roles={['admin']}><ErrorBoundary title="Failed to load Resources"><ResourcesPage /></ErrorBoundary></ProtectedRoute>} />
-              <Route path="/admin/audit-log" element={<ProtectedRoute roles={['admin']}><ErrorBoundary title="Failed to load Audit Log"><AuditLog /></ErrorBoundary></ProtectedRoute>} />
+
+              {/* 3. Live Map */}
+              <Route path="/admin/map" element={<ErrorBoundary title="Failed to load Live Map"><LiveMap /></ErrorBoundary>} />
+
+              {/* 4. Rescue Teams & Resources */}
+              <Route path="/admin/resources" element={<ErrorBoundary title="Failed to load Rescue Teams & Resources"><AdminResources /></ErrorBoundary>} />
+              <Route path="/admin/teams" element={<Navigate to="/admin/resources" replace />} />
+
+              {/* 5. Notifications & Audit Trail */}
+              <Route path="/admin/activity" element={<ErrorBoundary title="Failed to load Notifications & Audit Trail"><AdminActivity /></ErrorBoundary>} />
+              <Route path="/admin/audit-log" element={<Navigate to="/admin/activity" replace />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />

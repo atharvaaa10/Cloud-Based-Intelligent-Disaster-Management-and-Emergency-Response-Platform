@@ -99,7 +99,7 @@ The platform is designed with clean architectural service boundaries (`USE_AWS=f
 
 3. **Emergency Alerting & Fan-Out → Amazon SNS:**
    * High-priority incidents and status transitions publish notifications to an SNS Topic.
-   * Subscribed emergency responders and authorities receive immediate email/SMS notifications.
+   * Subscribed operations administrators and authorities receive immediate email/SMS notifications.
    * *Local Abstraction:* `publish_disaster_alert` logs the alert event to the console.
 
 4. **Persistence → Amazon RDS for PostgreSQL:**

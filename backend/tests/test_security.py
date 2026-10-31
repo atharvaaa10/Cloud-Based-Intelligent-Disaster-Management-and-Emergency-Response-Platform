@@ -164,7 +164,7 @@ async def test_citizen_cannot_set_priority(client: AsyncClient, two_citizens):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 5. ROLE: citizen cannot update status (admin/responder only)
+# 5. ROLE: citizen cannot update status (admin only)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @pytest.mark.asyncio

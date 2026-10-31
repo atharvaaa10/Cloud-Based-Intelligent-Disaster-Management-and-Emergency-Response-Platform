@@ -268,7 +268,7 @@ async def test_photo_upload_url_rejects_unsupported_content_type(client: AsyncCl
 
 
 async def test_photo_url_rbac_permissions(client: AsyncClient):
-    """Only incident owner, admin, or assigned/system responder can access photo-url."""
+    """Only incident owner or admin can access photo-url."""
     owner_token = await register_and_login(client, "Photo Owner", "owner_pic@test.com", "pic12345")
     other_citizen_token = await register_and_login(client, "Other Citizen", "other_cit@test.com", "cit12345")
     admin_token = await create_user_with_role(RoleEnum.admin, "Photo Admin", "admin_pic@test.com")

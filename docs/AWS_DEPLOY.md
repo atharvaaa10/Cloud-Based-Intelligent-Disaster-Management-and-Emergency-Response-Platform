@@ -10,8 +10,8 @@ This guide provides end-to-end instructions for deploying the complete event-dri
 ```mermaid
 flowchart TB
     subgraph Internet["Public Internet"]
-        User["Citizen / Responder / Admin Browser"]
-        Subscriber["Admin / Responder Email Inbox"]
+        User["Citizen / Admin Browser"]
+        Subscriber["Admin Alert Email Inbox"]
     end
 
     subgraph AWS["AWS Cloud (Region: e.g. ap-south-1)"]

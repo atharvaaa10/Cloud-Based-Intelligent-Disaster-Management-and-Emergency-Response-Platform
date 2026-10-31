@@ -120,7 +120,7 @@ async def get_photo_upload_url(
 ):
     """
     Generate a presigned S3 PUT URL for uploading incident emergency photos.
-    Restricted to the incident reporter, responder, or admin.
+    Restricted to the incident reporter or admin.
     """
     result = await db.execute(select(Incident).where(Incident.id == incident_id))
     incident = result.scalar_one_or_none()
@@ -242,7 +242,15 @@ async def list_incidents(
 ):
     query = select(Incident)
     if status_filter:
-        query = query.where(Incident.status == status_filter)
+        if status_filter == "pending":
+            query = query.where(Incident.status.in_([StatusEnum.reported, StatusEnum.under_review]))
+        elif status_filter == "active":
+            query = query.where(Incident.status.in_([StatusEnum.assigned, StatusEnum.in_progress]))
+        elif "," in status_filter:
+            statuses = [s.strip() for s in status_filter.split(",") if s.strip()]
+            query = query.where(Incident.status.in_(statuses))
+        else:
+            query = query.where(Incident.status == status_filter)
     if priority:
         query = query.where(Incident.priority == priority)
     if category:
@@ -273,7 +281,7 @@ async def get_incident(
     if not incident:
         raise HTTPException(status_code=404, detail="Incident not found")
 
-    # Only owner or admin/responder can view incident details
+    # Only owner or admin can view incident details
     role = current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role)
     if role != "admin" and incident.reporter_id != current_user.id:
         raise HTTPException(

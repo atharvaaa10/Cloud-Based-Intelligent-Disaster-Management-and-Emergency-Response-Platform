@@ -15,6 +15,7 @@ import {
   X,
   LifeBuoy,
   Bell,
+  Activity,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useBellCount } from '../hooks/useBellCount';
@@ -40,18 +41,19 @@ export default function AppLayout() {
 
   const getPageTitle = () => {
     const p = location.pathname;
-    if (p.startsWith('/admin/incidents/')) return 'Incident details';
-    if (p === '/admin') return 'Operational dashboard';
-    if (p === '/admin/teams') return 'Team dispatch & fleet';
-    if (p === '/admin/resources') return 'Emergency resources';
-    if (p === '/admin/audit-log') return 'Security audit trail';
-    if (p === '/citizen/report') return 'Report emergency';
-    if (p === '/citizen/map' || p === '/map') return 'Live disaster map';
-    if (p === '/citizen/requests' || p === '/citizen/my-requests') return 'My emergency requests';
-    if (p === '/citizen/resources') return 'Emergency resources';
+    if (p.startsWith('/admin/incidents/')) return 'Incident Details';
+    if (p === '/admin/incidents') return 'Incident Management';
+    if (p === '/admin/map') return 'Live Map';
+    if (p === '/admin/resources' || p === '/admin/teams') return 'Rescue Teams & Resources';
+    if (p === '/admin/activity' || p === '/admin/audit-log') return 'Notifications & Audit Trail';
+    if (p === '/admin') return 'Dashboard';
+    if (p === '/citizen/report') return 'Report Emergency';
+    if (p === '/citizen/map' || p === '/map') return 'Live Disaster Map';
+    if (p === '/citizen/requests' || p === '/citizen/my-requests') return 'My Emergency Requests';
+    if (p === '/citizen/resources') return 'Emergency Resources';
     if (p === '/citizen/updates') return 'Updates';
-    if (p === '/citizen') return 'Citizen overview';
-    return 'Disaster management';
+    if (p === '/citizen') return 'Citizen Overview';
+    return 'Disaster Management';
   };
 
   // Close mobile sidebar on link navigation
@@ -270,55 +272,46 @@ export default function AppLayout() {
         <nav className="sidebar-nav" aria-label="Operations navigation">
           {isAdmin && (
             <>
-              <div className="nav-section-label">Operations</div>
               <NavLink
                 to="/admin"
                 end
                 className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
                 onClick={closeMobile}
               >
-                <LayoutDashboard size={15} strokeWidth={1.8} className="nav-link-icon" />
-                <span>Incidents</span>
+                <LayoutDashboard size={16} strokeWidth={1.8} className="nav-link-icon" />
+                <span>Dashboard</span>
               </NavLink>
               <NavLink
-                to="/citizen/map"
+                to="/admin/incidents"
                 className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
                 onClick={closeMobile}
               >
-                <MapIcon size={15} strokeWidth={1.8} className="nav-link-icon" />
-                <span>Live map</span>
+                <AlertTriangle size={16} strokeWidth={1.8} className="nav-link-icon" />
+                <span>Incident Management</span>
               </NavLink>
-            </>
-          )}
-
-          {isAdmin && (
-            <>
-              <div className="nav-section-label">Fleet & Resources</div>
               <NavLink
-                to="/admin/teams"
+                to="/admin/map"
                 className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
                 onClick={closeMobile}
               >
-                <Users size={15} strokeWidth={1.8} className="nav-link-icon" />
-                <span>Rescue teams</span>
+                <MapIcon size={16} strokeWidth={1.8} className="nav-link-icon" />
+                <span>Live Map</span>
               </NavLink>
               <NavLink
                 to="/admin/resources"
                 className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
                 onClick={closeMobile}
               >
-                <Package size={15} strokeWidth={1.8} className="nav-link-icon" />
-                <span>Supplies & vehicles</span>
+                <Users size={16} strokeWidth={1.8} className="nav-link-icon" />
+                <span>Rescue Teams & Resources</span>
               </NavLink>
-
-              <div className="nav-section-label">Governance</div>
               <NavLink
-                to="/admin/audit-log"
+                to="/admin/activity"
                 className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
                 onClick={closeMobile}
               >
-                <FileText size={15} strokeWidth={1.8} className="nav-link-icon" />
-                <span>Audit trail</span>
+                <Activity size={16} strokeWidth={1.8} className="nav-link-icon" />
+                <span>Notifications & Audit Trail</span>
               </NavLink>
             </>
           )}

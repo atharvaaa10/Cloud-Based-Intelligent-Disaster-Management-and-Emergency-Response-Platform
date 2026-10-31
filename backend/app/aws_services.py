@@ -226,7 +226,7 @@ async def publish_disaster_alert(
 ) -> bool:
     """
     Publishes an alert notification to the Amazon SNS topic.
-    Subscribed admins, responders, and CloudWatch alarms receive updates.
+    Subscribed admins and CloudWatch alarms receive updates.
     """
     current_settings = get_settings()
     # AWS SNS subjects are limited to 100 ASCII characters

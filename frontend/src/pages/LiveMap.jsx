@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { renderToString } from 'react-dom/server';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet.markercluster';
@@ -34,6 +34,8 @@ import {
   Truck,
   Layers,
   Waves,
+  Flame,
+  Shield,
 } from 'lucide-react';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
@@ -56,6 +58,7 @@ import IncidentCard from '../components/map/IncidentCard';
 import DetailPanel from '../components/map/DetailPanel';
 import NearbyResources from '../components/map/NearbyResources';
 import AppTileLayer from '../components/map/AppTileLayer';
+import AssignTeamModal from '../components/admin/AssignTeamModal';
 
 // ── Haversine Distance Formula (km) ────────────────────────────
 function haversineKm(lat1, lon1, lat2, lon2) {
@@ -73,7 +76,7 @@ function haversineKm(lat1, lon1, lat2, lon2) {
   return Math.round(R * c * 10) / 10;
 }
 
-// ── Fallback Pune Demo Data (Used ONLY if API returns empty) ────
+// ── Fallback Pune Demo Data (Used ONLY if citizen API returns empty) ────
 const DEMO_PUNE_TEAMS = [
   { id: 901, name: 'Rescue Team Alpha', approx_latitude: 18.5284, approx_longitude: 73.8465, status: 'busy', isDemo: true },
   { id: 902, name: 'Medical Response Bravo', approx_latitude: 18.5520, approx_longitude: 73.8010, status: 'busy', isDemo: true },
@@ -106,14 +109,25 @@ const CATEGORY_COLORS = {
   other: '#01AEFD',
 };
 
-const ITEMS_PER_PAGE = 5;
+// ── Priority Colors for Admin Map ──────────────────────────────
+const PRIORITY_COLORS = {
+  critical: '#F04438',
+  high: '#F59E0B',
+  medium: '#FACC15',
+  low: '#01AEFD',
+};
 
-export default function LiveMap() {
+const ITEMS_PER_PAGE = 6;
+
+export default function LiveMap({ adminMode: propAdminMode }) {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const toast = useToast();
 
-  const isCitizen = user?.role === 'citizen';
+  const isAdminMode = propAdminMode !== undefined
+    ? propAdminMode
+    : (location.pathname.startsWith('/admin') || (user?.role === 'admin' && location.pathname.includes('/admin')));
 
   // ── Data State ────────────────────────────────────────────────
   const [publicData, setPublicData] = useState({
@@ -124,6 +138,7 @@ export default function LiveMap() {
   });
   const [myIncidents, setMyIncidents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -149,10 +164,15 @@ export default function LiveMap() {
   const [showLayersDropdown, setShowLayersDropdown] = useState(false);
 
   // ── Selection & GPS State ─────────────────────────────────────
-  const [selectedItem, setSelectedItem] = useState(null); // incident, place, or zone
+  const [selectedItem, setSelectedItem] = useState(null); // incident, place, team, or zone
   const [selectedType, setSelectedType] = useState(null); // 'own' | 'public' | 'place' | 'zone' | 'team'
   const [userLocation, setUserLocation] = useState(null); // { lat, lon }
   const [locating, setLocating] = useState(false);
+
+  // ── Assign Team Modal State (Admin) ───────────────────────────
+  const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [assignIncidentId, setAssignIncidentId] = useState(null);
+  const [assignIncidentCode, setAssignIncidentCode] = useState(null);
 
   // Responsive Drawer & Mobile View State
   const [leftDrawerOpen, setLeftDrawerOpen] = useState(false);
@@ -164,48 +184,70 @@ export default function LiveMap() {
   const [mapInstance, setMapInstance] = useState(null);
   const clusterGroupRef = useRef(null);
   const zonesGroupRef = useRef(null);
-  const userMarkerRef = useRef(null);
   const markersByItemKeyRef = useRef(new Map());
-  const initialFitDoneRef = useRef(false);
 
-  // ── Track Whether Demo Data is Actively Shown ──────────────────
+  // ── Track Whether Demo Data is Actively Shown (Citizen only) ──
   const isUsingDemoTeams = useMemo(() => {
-    return (!publicData.teams || publicData.teams.length === 0);
-  }, [publicData.teams]);
+    return (!isAdminMode && (!publicData.teams || publicData.teams.length === 0));
+  }, [publicData.teams, isAdminMode]);
 
   const activeTeams = useMemo(() => {
     if (publicData.teams && publicData.teams.length > 0) return publicData.teams;
-    return DEMO_PUNE_TEAMS;
-  }, [publicData.teams]);
+    return isAdminMode ? [] : DEMO_PUNE_TEAMS;
+  }, [publicData.teams, isAdminMode]);
 
   const activePlaces = useMemo(() => {
     const list = [...(publicData.places || [])];
-    const hasSupply = list.some((p) => p.type === 'relief_supply');
-    if (!hasSupply) {
-      list.push(...DEMO_PUNE_DEPOTS);
+    if (!isAdminMode) {
+      const hasSupply = list.some((p) => p.type === 'relief_supply');
+      if (!hasSupply) {
+        list.push(...DEMO_PUNE_DEPOTS);
+      }
     }
     return list;
-  }, [publicData.places]);
+  }, [publicData.places, isAdminMode]);
 
   // ── Fetch Map & Incident Data ─────────────────────────────────
   const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
-      const pubRes = await api.get('/map/public');
-      setPublicData({
-        incidents: Array.isArray(pubRes?.incidents) ? pubRes.incidents : [],
-        places: Array.isArray(pubRes?.places) ? pubRes.places : [],
-        affected_zones: Array.isArray(pubRes?.affected_zones) ? pubRes.affected_zones : [],
-        teams: Array.isArray(pubRes?.teams) ? pubRes.teams : [],
-      });
+      if (isAdminMode) {
+        // Admin-only endpoint with exact coordinates and full details
+        const params = new URLSearchParams();
+        if (selectedCategory) params.set('category', selectedCategory);
+        if (selectedPriority) params.set('priority', selectedPriority);
+        if (selectedStatus) params.set('status', selectedStatus);
 
-      if (user) {
-        try {
-          const mineRes = await api.get('/incidents/mine');
-          const list = Array.isArray(mineRes) ? mineRes : mineRes?.items || [];
-          setMyIncidents(list);
-        } catch (e) {
-          console.warn('[MAP] Could not fetch user own incidents:', e);
-          setMyIncidents([]);
+        const qs = params.toString();
+        const res = await api.get(`/admin/map${qs ? '?' + qs : ''}`);
+
+        setPublicData({
+          incidents: Array.isArray(res?.incidents) ? res.incidents : [],
+          places: Array.isArray(res?.places) ? res.places : [],
+          affected_zones: Array.isArray(res?.affected_zones) ? res.affected_zones : [],
+          teams: Array.isArray(res?.response_teams) ? res.response_teams : [],
+        });
+        setMyIncidents([]);
+      } else {
+        // Public citizen endpoint
+        const pubRes = await api.get('/map/public');
+        setPublicData({
+          incidents: Array.isArray(pubRes?.incidents) ? pubRes.incidents : [],
+          places: Array.isArray(pubRes?.places) ? pubRes.places : [],
+          affected_zones: Array.isArray(pubRes?.affected_zones) ? pubRes.affected_zones : [],
+          teams: Array.isArray(pubRes?.teams) ? pubRes.teams : [],
+        });
+
+        if (user) {
+          try {
+            const mineRes = await api.get('/incidents/mine');
+            const list = Array.isArray(mineRes) ? mineRes : mineRes?.items || [];
+            setMyIncidents(list);
+          } catch (e) {
+            console.warn('[MAP] Could not fetch user own incidents:', e);
+            setMyIncidents([]);
+          }
         }
       }
 
@@ -215,15 +257,16 @@ export default function LiveMap() {
       );
     } catch (err) {
       console.error('[MAP] Error loading map data:', err);
-      toast.error('Failed to load live map data.');
+      setError(err.message || 'Failed to load live map data.');
+      toast.error(err.message || 'Failed to load live map data.');
     } finally {
       setLoading(false);
     }
-  }, [user, toast]);
+  }, [isAdminMode, selectedCategory, selectedPriority, selectedStatus, user, toast]);
 
   useEffect(() => {
     fetchData();
-    // Poll every 30 seconds for real-time status updates
+    // Poll every 30 seconds for real-time updates
     const pollInterval = setInterval(fetchData, 30000);
     return () => clearInterval(pollInterval);
   }, [fetchData]);
@@ -232,6 +275,22 @@ export default function LiveMap() {
   const myIncidentIds = useMemo(() => new Set((myIncidents || []).map((i) => i.id)), [myIncidents]);
 
   const allIncidents = useMemo(() => {
+    if (isAdminMode) {
+      // Admin sees exact coordinates and complete info
+      return (publicData?.incidents || []).map((inc) => {
+        const lat = typeof inc.latitude === 'number' ? inc.latitude : parseFloat(inc.latitude);
+        const lon = typeof inc.longitude === 'number' ? inc.longitude : parseFloat(inc.longitude);
+        return {
+          ...inc,
+          isOwn: false,
+          displayLat: !isNaN(lat) ? lat : null,
+          displayLon: !isNaN(lon) ? lon : null,
+          displayArea: inc.address || inc.location_text || 'Exact Pune Coordinates',
+          headline: inc.description || `${(inc.category || 'Incident').replace(/_/g, ' ')} emergency`,
+        };
+      });
+    }
+
     const list = [];
     (myIncidents || []).forEach((inc) => {
       const lat = typeof inc.latitude === 'number' ? inc.latitude : parseFloat(inc.latitude);
@@ -262,7 +321,7 @@ export default function LiveMap() {
     });
 
     return list;
-  }, [myIncidents, publicData?.incidents, myIncidentIds]);
+  }, [isAdminMode, publicData?.incidents, myIncidents, myIncidentIds]);
 
   const filteredIncidents = useMemo(() => {
     return allIncidents.filter((item) => {
@@ -275,7 +334,8 @@ export default function LiveMap() {
         const area = (item.displayArea || '').toLowerCase();
         const cat = (item.category || '').toLowerCase();
         const title = (item.headline || '').toLowerCase();
-        if (!code.includes(q) && !area.includes(q) && !cat.includes(q) && !title.includes(q)) {
+        const desc = (item.description || '').toLowerCase();
+        if (!code.includes(q) && !area.includes(q) && !cat.includes(q) && !title.includes(q) && !desc.includes(q)) {
           return false;
         }
       }
@@ -299,13 +359,11 @@ export default function LiveMap() {
 
   // ── Nearby Resources within 5 km ──────────────────────────────
   const referenceCoords = useMemo(() => {
-    if (selectedItem) {
-      if (selectedItem.displayLat != null && selectedItem.displayLon != null) {
-        return { lat: selectedItem.displayLat, lon: selectedItem.displayLon };
-      }
-      if (selectedItem.latitude != null && selectedItem.longitude != null) {
-        return { lat: selectedItem.latitude, lon: selectedItem.longitude };
-      }
+    if (selectedItem?.displayLat != null && selectedItem?.displayLon != null) {
+      return { lat: selectedItem.displayLat, lon: selectedItem.displayLon };
+    }
+    if (selectedItem?.latitude != null && selectedItem?.longitude != null) {
+      return { lat: selectedItem.latitude, lon: selectedItem.longitude };
     }
     if (userLocation) return userLocation;
     return { lat: 18.5204, lon: 73.8567 }; // Central Pune fallback
@@ -318,8 +376,8 @@ export default function LiveMap() {
       ...activeTeams.map((t) => ({
         ...t,
         type: 'team',
-        latitude: t.approx_latitude,
-        longitude: t.approx_longitude,
+        latitude: t.latitude != null ? t.latitude : t.approx_latitude,
+        longitude: t.longitude != null ? t.longitude : t.approx_longitude,
         kind: 'team',
       })),
     ];
@@ -363,16 +421,15 @@ export default function LiveMap() {
 
     try {
       const map = L.map(mapContainerRef.current, {
-        center: [18.5254, 73.8420],
+        center: [18.5204, 73.8567],
         zoom: 12,
-        maxZoom: 19,
+        minZoom: 10,
+        maxZoom: 18,
         zoomControl: false,
+        attributionControl: true,
       });
 
-      // Bottom-right zoom control
       L.control.zoom({ position: 'bottomright' }).addTo(map);
-
-      // Bottom-right scale bar
       L.control.scale({ imperial: false, position: 'bottomright' }).addTo(map);
 
       // Group for hazard zones
@@ -400,7 +457,6 @@ export default function LiveMap() {
       mapInstanceRef.current = map;
       setMapInstance(map);
 
-      // Ensure map calculates correct size after flex/grid layout completes
       setTimeout(() => {
         if (mapInstanceRef.current) {
           mapInstanceRef.current.invalidateSize();
@@ -419,7 +475,7 @@ export default function LiveMap() {
     };
   }, []);
 
-  // ── Render Affected Zones (Dashed red polygon outline with translucent red fill) ──
+  // ── Render Affected Zones (Hazard Circles) ────────────────────
   useEffect(() => {
     if (!mapInstanceRef.current || !zonesGroupRef.current) return;
     zonesGroupRef.current.clearLayers();
@@ -440,11 +496,15 @@ export default function LiveMap() {
         dashArray: '6, 6',
       });
 
-      circle.bindTooltip(
-        `<div style="font-weight: 700; font-size: 11.5px; color: #F4F7FA;">Affected Region (Approx.)</div>
-         <div style="font-size: 11px; color: #CBD5E1; margin-top: 2px;">⚠️ ${zone.name}</div>`,
-        { sticky: true, className: 'leaflet-dark-tooltip' }
-      );
+      circle.bindPopup(`
+        <div class="zone-popup-card">
+          <span class="zone-popup-title">${zone.name}</span>
+          <span class="zone-popup-desc">${zone.description || ''}</span>
+          <span class="zone-popup-radius">Radius: ${((zone.radius_meters || 1600) / 1000).toFixed(1)} km</span>
+        </div>
+      `, {
+        className: 'custom-dark-popup',
+      });
 
       circle.on('click', () => {
         setSelectedItem({
@@ -470,7 +530,7 @@ export default function LiveMap() {
 
     const boundsPoints = [];
 
-    // 1. Incidents (Own & Public)
+    // 1. Incidents (Colored by PRIORITY for Admin, or CATEGORY for Citizen)
     if (layers.incidents) {
       filteredIncidents.forEach((inc) => {
         const isOwn = inc.isOwn;
@@ -481,15 +541,20 @@ export default function LiveMap() {
 
         const isSelected = selectedItem?.id === inc.id;
         const isCritical = inc.priority === 'critical';
+
+        // Admin: colored by priority; Citizen: colored by category
+        const prioColor = PRIORITY_COLORS[inc.priority?.toLowerCase()] || '#01AEFD';
         const catColor = CATEGORY_COLORS[inc.category] || '#01AEFD';
+        const markerColor = isAdminMode ? prioColor : catColor;
+
         const CatIcon = CATEGORY_ICONS[inc.category] || AlertTriangle;
 
         const svgIconStr = renderToString(
-          <CatIcon size={18} strokeWidth={2.2} color={catColor} />
+          <CatIcon size={18} strokeWidth={2.2} color={markerColor} />
         );
 
         const htmlContent = `
-          <div class="custom-navy-marker ${isCritical ? 'is-critical-glow' : ''} ${isSelected ? 'is-marker-selected' : ''}" style="--marker-border-color: ${catColor};">
+          <div class="custom-navy-marker ${isCritical ? 'is-critical-glow' : ''} ${isSelected ? 'is-marker-selected' : ''}" style="--marker-border-color: ${markerColor};">
             ${isOwn ? '<span class="marker-own-star">★</span>' : ''}
             ${svgIconStr}
           </div>
@@ -506,11 +571,14 @@ export default function LiveMap() {
 
         const displayTitle = inc.headline || `${(inc.category || 'Incident').replace('_', ' ').toUpperCase()} &bull; ${inc.displayArea}`;
         const displayId = inc.public_code || `#DR-${inc.id}`;
+        const prioTag = isAdminMode && inc.priority
+          ? `<span style="color: ${prioColor}; font-weight: 700; font-size: 10px; margin-left: 6px; text-transform: uppercase;">[${inc.priority}]</span>`
+          : '';
 
         const popupHtml = `
           <div class="incident-popup-card">
             <div class="incident-popup-content">
-              <span class="incident-popup-id">${displayId}</span>
+              <span class="incident-popup-id">${displayId}${prioTag}</span>
               <span class="incident-popup-title" title="${displayTitle}">${displayTitle}</span>
             </div>
             <div class="incident-popup-chevron">&rsaquo;</div>
@@ -606,8 +674,10 @@ export default function LiveMap() {
     // 3. Response Teams (Truck Icon in Blue #0EA5FF)
     if (layers.teams) {
       activeTeams.forEach((team) => {
-        const tLat = typeof team.approx_latitude === 'number' ? team.approx_latitude : parseFloat(team.approx_latitude);
-        const tLon = typeof team.approx_longitude === 'number' ? team.approx_longitude : parseFloat(team.approx_longitude);
+        const rawLat = team.latitude != null ? team.latitude : team.approx_latitude;
+        const rawLon = team.longitude != null ? team.longitude : team.approx_longitude;
+        const tLat = typeof rawLat === 'number' ? rawLat : parseFloat(rawLat);
+        const tLon = typeof rawLon === 'number' ? rawLon : parseFloat(rawLon);
         if (isNaN(tLat) || isNaN(tLon) || tLat == null || tLon == null) return;
 
         boundsPoints.push([tLat, tLon]);
@@ -637,7 +707,7 @@ export default function LiveMap() {
         marker.bindPopup(`
           <div class="incident-popup-card">
             <div class="incident-popup-content">
-              <span class="incident-popup-id">RESPONSE TEAM</span>
+              <span class="incident-popup-id">RESPONSE TEAM (${team.status || 'ACTIVE'})</span>
               <span class="incident-popup-title">${team.name}</span>
             </div>
             <div class="incident-popup-chevron">&rsaquo;</div>
@@ -657,18 +727,7 @@ export default function LiveMap() {
         clusterGroupRef.current.addLayer(marker);
       });
     }
-
-    // fitBounds on initial load
-    if (!initialFitDoneRef.current && boundsPoints.length > 0 && mapInstanceRef.current) {
-      initialFitDoneRef.current = true;
-      try {
-        const bounds = L.latLngBounds(boundsPoints);
-        mapInstanceRef.current.fitBounds(bounds, { padding: [40, 40], maxZoom: 13 });
-      } catch (err) {
-        console.warn('[FIT_BOUNDS_ERROR]', err);
-      }
-    }
-  }, [filteredIncidents, activePlaces, activeTeams, layers, selectedItem?.id]);
+  }, [filteredIncidents, activePlaces, activeTeams, layers, selectedItem?.id, isAdminMode]);
 
   // ── Focus Map on Incident Click from List ──────────────────────
   const handleSelectIncident = (item) => {
@@ -681,7 +740,7 @@ export default function LiveMap() {
     }
 
     if (mapInstanceRef.current && item.displayLat != null && item.displayLon != null) {
-      mapInstanceRef.current.flyTo([item.displayLat, item.displayLon], 14, {
+      mapInstanceRef.current.flyTo([item.displayLat, item.displayLon], 15, {
         duration: 1.0,
       });
 
@@ -714,32 +773,15 @@ export default function LiveMap() {
 
         if (mapInstanceRef.current) {
           mapInstanceRef.current.flyTo([lat, lon], 14, { duration: 1.2 });
-
-          if (userMarkerRef.current) {
-            mapInstanceRef.current.removeLayer(userMarkerRef.current);
-          }
-
-          const pulseIcon = L.divIcon({
-            className: 'user-gps-icon',
-            html: '<div class="gps-pulse-marker" title="Your live location"></div>',
-            iconSize: [20, 20],
-            iconAnchor: [10, 10],
-          });
-
-          userMarkerRef.current = L.marker([lat, lon], { icon: pulseIcon })
-            .addTo(mapInstanceRef.current)
-            .bindPopup('<strong>📍 You are here</strong>')
-            .openPopup();
         }
-
-        toast.success('Centered map on your current location.');
+        toast.success('Centered on your GPS location.');
       },
       (err) => {
         setLocating(false);
-        console.warn('[GEO_ERR]', err);
-        toast.error('Location permission was denied. Defaulting to Pune city center.');
+        console.warn('Geolocation error:', err);
+        toast.error('Could not acquire your current location.');
       },
-      { timeout: 8000 }
+      { timeout: 10000, enableHighAccuracy: true }
     );
   };
 
@@ -756,31 +798,39 @@ export default function LiveMap() {
       fetchData();
     } catch (err) {
       console.error('Mark responding error:', err);
-      toast.error('Failed to mark incident as responding.');
+      toast.error(err.message || 'Failed to mark incident as responding.');
     } finally {
       setActionLoading(false);
     }
   };
 
-  const handleAssignTeam = async (incidentId) => {
-    const teamId = window.prompt('Enter Team ID to assign (e.g. 1):', '1');
-    if (!teamId) return;
-    setActionLoading(true);
-    try {
-      await api.post(`/incidents/${incidentId}/assign`, { team_id: parseInt(teamId, 10) });
-      toast.success(`Team #${teamId} assigned to incident.`);
-      fetchData();
-    } catch (err) {
-      console.error('Assign team error:', err);
-      toast.error('Failed to assign team to incident.');
-    } finally {
-      setActionLoading(false);
-    }
+  const handleAssignTeam = (incidentId) => {
+    const inc = allIncidents.find((i) => i.id === incidentId);
+    setAssignIncidentId(incidentId);
+    setAssignIncidentCode(inc?.public_code || `INC-${incidentId}`);
+    setAssignModalOpen(true);
   };
+
+  const handleTeamAssigned = () => {
+    fetchData();
+    toast.success('Response team successfully deployed and assigned.');
+  };
+
+  const resetFilters = () => {
+    setSelectedCategory('');
+    setSelectedPriority('');
+    setSelectedStatus('');
+    setSearchQuery('');
+    setPage(1);
+  };
+
+  const hasActiveFilters = Boolean(
+    selectedCategory || selectedPriority || selectedStatus || searchQuery.trim()
+  );
 
   return (
     <div className="live-map-wrapper">
-      {/* ── 1. Top Stat Cards (Reference Tinted 5-Card Row) ── */}
+      {/* ── 1. Top Stat Cards Row ── */}
       <ErrorBoundary title="Failed to load telemetry stats" compact>
         <GlobalStatRow
           userCoords={
@@ -791,9 +841,22 @@ export default function LiveMap() {
         />
       </ErrorBoundary>
 
-      {/* Mobile & Tablet Drawer toggles */}
-      <div className="live-map-mobile-controls" style={{ display: 'none' }}>
-        <div className="ui-btn-group mobile-only-toggle">
+      {/* Sync Error Banner if any */}
+      {error && (
+        <Card style={{ marginBottom: 12, padding: '10px 16px', background: 'rgba(239, 68, 68, 0.1)', borderColor: 'rgba(239, 68, 68, 0.3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#EF4444', fontSize: 13 }}>
+            <AlertTriangle size={16} />
+            <span>Telemetry error: {error}</span>
+          </div>
+          <Button variant="secondary" size="sm" icon={RotateCcw} onClick={fetchData}>
+            Retry
+          </Button>
+        </Card>
+      )}
+
+      {/* Mobile/Tablet Switcher */}
+      <div className="map-view-switcher" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <div style={{ display: 'flex', gap: 6 }}>
           <button
             type="button"
             className={`ui-btn ui-btn-sm ${mobileTab === 'map' ? 'ui-btn-primary' : 'ui-btn-secondary'}`}
@@ -823,21 +886,21 @@ export default function LiveMap() {
           aria-label="Toggle Incidents List Drawer"
         >
           <List size={14} />
-          <span>Incidents ({filteredIncidents.length})</span>
+          <span>Directory ({filteredIncidents.length})</span>
         </button>
       </div>
 
-      {/* ── 2. Main View: 3-Column Grid (Left: ~28%, Center: ~48%, Right: ~24%) ── */}
+      {/* ── 2. Main View: 3-Column Layout ── */}
       <div className="live-map-main-area">
-        {/* Left Panel: Incidents Directory (~28%) */}
+        {/* Left Panel: Incidents Directory */}
         <aside
           className={`map-left-list-panel ${leftDrawerOpen ? 'drawer-open' : ''} ${mobileTab === 'list' ? 'mobile-visible' : ''}`}
           aria-label="Incidents Directory"
         >
-          {/* Header Top: Title + Status Badges + Category Chips + Search + 2 Dropdowns */}
+          {/* Header Top */}
           <div className="map-left-header-top">
             <div className="map-left-title-row">
-              <h2 className="map-left-title">Incidents</h2>
+              <h2 className="map-left-title">{isAdminMode ? 'Operational Directory' : 'Incidents'}</h2>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
                 {isUsingDemoTeams && (
@@ -854,7 +917,7 @@ export default function LiveMap() {
                       alignItems: 'center',
                       gap: 3,
                     }}
-                    title="Showing sample teams/depots while waiting for backend telemetry"
+                    title="Showing demo response teams while offline"
                   >
                     <Info size={10} />
                     Demo data
@@ -881,7 +944,7 @@ export default function LiveMap() {
               </div>
             </div>
 
-            {/* Category Chips in One Row: All, Rescue, Medical, Food & Water, Shelter (with Others accessible via scroll) */}
+            {/* Category Filter Chips */}
             <div className="map-category-chips-scroll" role="tablist" aria-label="Category filter">
               {[
                 { id: '', label: 'All' },
@@ -910,11 +973,11 @@ export default function LiveMap() {
               })}
             </div>
 
-            {/* Search Input with search icon on the RIGHT, 40px tall, dark input background */}
+            {/* Search Input */}
             <div className="map-search-wrap">
               <input
                 type="text"
-                placeholder="Search incidents by location or ID..."
+                placeholder={isAdminMode ? 'Search ID, description, or exact address...' : 'Search incidents by location or ID...'}
                 className="map-search-input"
                 value={searchQuery}
                 onChange={(e) => {
@@ -922,12 +985,12 @@ export default function LiveMap() {
                   setPage(1);
                 }}
                 id="incidents-search-input"
-                aria-label="Search incidents by location or ID"
+                aria-label="Search incidents"
               />
               <Search size={16} className="map-search-icon" aria-hidden="true" />
             </div>
 
-            {/* Priority & Status: Labels above custom-styled dark selects with chevrons */}
+            {/* Priority & Status Select Dropdowns */}
             <div className="map-dropdowns-row">
               <div className="map-select-field-group">
                 <label htmlFor="incidents-filter-priority" className="map-select-field-label">
@@ -975,14 +1038,36 @@ export default function LiveMap() {
                     <option value="assigned">Assigned</option>
                     <option value="in_progress">In Progress</option>
                     <option value="resolved">Resolved</option>
+                    {isAdminMode && <option value="cancelled">Cancelled</option>}
                   </select>
                   <ChevronDown size={14} className="map-select-chevron" aria-hidden="true" />
                 </div>
               </div>
             </div>
+
+            {hasActiveFilters && (
+              <div style={{ marginTop: 6, display: 'flex', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--accent-primary)',
+                    fontSize: 11.5,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                  }}
+                >
+                  <RotateCcw size={12} /> Reset filters
+                </button>
+              </div>
+            )}
           </div>
 
-          {/* Incident Cards Scrollable Area */}
+          {/* Click-to-Center Incidents Directory Scrollable List */}
           <div className="map-incident-scroll" role="list" aria-label="Incident cards">
             {loading ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 8 }}>
@@ -1001,8 +1086,13 @@ export default function LiveMap() {
               <div style={{ padding: '36px 16px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                 <p style={{ fontSize: 13, fontWeight: 500 }}>No incidents found.</p>
                 <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-                  Try resetting the search query or category filters.
+                  {hasActiveFilters ? 'Try adjusting your search criteria or resetting filters.' : 'Active reports will appear here in real-time.'}
                 </p>
+                {hasActiveFilters && (
+                  <Button variant="secondary" size="sm" onClick={resetFilters} style={{ marginTop: 12 }}>
+                    Clear Filters
+                  </Button>
+                )}
               </div>
             ) : (
               paginatedIncidents.map((item) => (
@@ -1069,7 +1159,7 @@ export default function LiveMap() {
           )}
         </aside>
 
-        {/* Center Map Viewport (~48-50%) */}
+        {/* Center Map Viewport */}
         <main className="map-viewport-container" aria-label="Interactive map representation">
           <ErrorBoundary
             title="Map view encountered an issue"
@@ -1081,7 +1171,7 @@ export default function LiveMap() {
             </div>
           </ErrorBoundary>
 
-          {/* Top-Left Segmented Control (Map vs Satellite) - only control in top-left */}
+          {/* Top-Left Segmented Control (Map vs Satellite) */}
           <div className="map-tile-segmented-control" role="group" aria-label="Map tile selection">
             <button
               type="button"
@@ -1202,10 +1292,10 @@ export default function LiveMap() {
           </button>
 
           {/* Floating Collapsible Legend (Bottom-Left) */}
-          <MapLegend isOpen={showLegend} onToggle={setShowLegend} />
+          <MapLegend isOpen={showLegend} onToggle={setShowLegend} adminMode={isAdminMode} />
         </main>
 
-        {/* Right Detail & Nearby Resources Panel (~24%) */}
+        {/* Right Detail & Nearby Resources Panel */}
         <DetailPanel
           selectedItem={selectedItem}
           selectedType={selectedType}
@@ -1216,8 +1306,18 @@ export default function LiveMap() {
           onMarkResponding={handleMarkResponding}
           onAssignTeam={handleAssignTeam}
           actionLoading={actionLoading}
+          adminMode={isAdminMode}
         />
       </div>
+
+      {/* Admin Assign Team Modal */}
+      <AssignTeamModal
+        isOpen={assignModalOpen}
+        onClose={() => setAssignModalOpen(false)}
+        incidentId={assignIncidentId}
+        incidentCode={assignIncidentCode}
+        onAssigned={handleTeamAssigned}
+      />
     </div>
   );
 }

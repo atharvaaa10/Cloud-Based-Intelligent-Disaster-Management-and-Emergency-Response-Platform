@@ -90,7 +90,7 @@
 3. In the incident detail view, update status to `in_progress` and then `resolved`.
 
 ### Spoken Script:
-> *"Within seconds of the triage and assignment events, Amazon SNS fans out alert emails to all subscribers. Once on-site responders complete the rescue, they update the incident to 'Resolved', which automatically releases the assigned rescue team back into the available resource pool."*
+> *"Within seconds of the triage and assignment events, Amazon SNS fans out alert emails to all subscribers. Once on-site rescue teams complete the rescue, they update the incident to 'Resolved', which automatically releases the assigned rescue team back into the available resource pool."*
 
 ---
 
